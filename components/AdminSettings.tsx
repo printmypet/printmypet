@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save } from 'lucide-react';
-import { ColorOption, PartsColors, FirebaseConfig } from '../types';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy } from 'lucide-react';
+import { PartsColors, SupabaseConfig } from '../types';
 import { Button } from './ui/Button';
 
 interface AdminSettingsProps {
@@ -24,28 +24,24 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [newColorHex, setNewColorHex] = useState('#000000');
   const [newTextureName, setNewTextureName] = useState('');
 
-  // Local state for Cloud Config
-  const [firebaseConfig, setFirebaseConfig] = useState<FirebaseConfig>({
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: ''
+  // Local state for Cloud Config (Supabase)
+  const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>({
+    supabaseUrl: '',
+    supabaseKey: ''
   });
   const [isCloudConfigured, setIsCloudConfigured] = useState(false);
 
   useEffect(() => {
-    const savedConfig = localStorage.getItem('app-firebase-config');
+    const savedConfig = localStorage.getItem('app-supabase-config');
     if (savedConfig) {
-      setFirebaseConfig(JSON.parse(savedConfig));
+      setSupabaseConfig(JSON.parse(savedConfig));
       setIsCloudConfigured(true);
     }
   }, []);
 
   const handleSaveCloudConfig = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('app-firebase-config', JSON.stringify(firebaseConfig));
+    localStorage.setItem('app-supabase-config', JSON.stringify(supabaseConfig));
     setIsCloudConfigured(true);
     alert('Configuração salva! Recarregue a página para conectar.');
     window.location.reload();
@@ -53,15 +49,11 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const handleClearCloudConfig = () => {
     if (confirm('Isso desconectará o app da nuvem. Os pedidos voltarão a ser salvos apenas neste dispositivo. Continuar?')) {
-      localStorage.removeItem('app-firebase-config');
+      localStorage.removeItem('app-supabase-config');
       setIsCloudConfigured(false);
-      setFirebaseConfig({
-        apiKey: '',
-        authDomain: '',
-        projectId: '',
-        storageBucket: '',
-        messagingSenderId: '',
-        appId: ''
+      setSupabaseConfig({
+        supabaseUrl: '',
+        supabaseKey: ''
       });
       window.location.reload();
     }
@@ -108,6 +100,26 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     }
   };
 
+  const copySql = () => {
+    const sql = `
+CREATE TABLE public.orders (
+  id UUID PRIMARY KEY,
+  "createdAt" TEXT,
+  status TEXT,
+  price NUMERIC,
+  "shippingCost" NUMERIC,
+  "isPaid" BOOLEAN,
+  customer JSONB,
+  products JSONB
+);
+
+-- Habilitar Realtime
+alter publication supabase_realtime add table public.orders;
+    `;
+    navigator.clipboard.writeText(sql.trim());
+    alert("SQL copiado para a área de transferência!");
+  };
+
   const partLabels: Record<keyof PartsColors, string> = {
     base: 'Base',
     ball: 'Bola',
@@ -141,17 +153,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                 onClick={() => setActiveTab('cloud')}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'cloud' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
             >
-                Nuvem / Backup
+                Nuvem (Supabase)
             </button>
         </div>
       </div>
 
       {activeTab === 'cloud' && (
-        <div className="max-w-2xl mx-auto">
-            <div className={`p-6 rounded-xl border ${isCloudConfigured ? 'bg-green-50 border-green-200' : 'bg-white border-slate-200'} shadow-sm`}>
+        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={`p-6 rounded-xl border ${isCloudConfigured ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'} shadow-sm`}>
                 <div className="flex items-center gap-3 mb-6">
                     {isCloudConfigured ? (
-                        <div className="p-3 bg-green-100 rounded-full text-green-600">
+                        <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
                             <Cloud className="w-6 h-6" />
                         </div>
                     ) : (
@@ -161,82 +173,41 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     )}
                     <div>
                         <h3 className="text-lg font-bold text-slate-900">
-                            {isCloudConfigured ? 'Conectado ao Firebase' : 'Configurar Conexão Firebase'}
+                            {isCloudConfigured ? 'Conectado ao Supabase' : 'Configurar Conexão Supabase'}
                         </h3>
                         <p className="text-sm text-slate-500">
                             {isCloudConfigured 
                                 ? 'Seus pedidos estão sendo sincronizados com a nuvem.' 
-                                : 'Conecte-se para compartilhar pedidos entre dispositivos.'}
+                                : 'Conecte-se para sincronizar pedidos em tempo real.'}
                         </p>
                     </div>
                 </div>
 
                 <form onSubmit={handleSaveCloudConfig} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Project ID</label>
-                            <input 
-                                type="text" 
-                                value={firebaseConfig.projectId}
-                                onChange={(e) => setFirebaseConfig({...firebaseConfig, projectId: e.target.value})}
-                                className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
-                                placeholder="ex: meupet-3d"
-                                required
-                            />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">API Key</label>
-                            <input 
-                                type="text" 
-                                value={firebaseConfig.apiKey}
-                                onChange={(e) => setFirebaseConfig({...firebaseConfig, apiKey: e.target.value})}
-                                className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
-                                placeholder="AIzaSy..."
-                                required
-                            />
-                        </div>
-                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Auth Domain</label>
-                            <input 
-                                type="text" 
-                                value={firebaseConfig.authDomain}
-                                onChange={(e) => setFirebaseConfig({...firebaseConfig, authDomain: e.target.value})}
-                                className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
-                                placeholder="meupet-3d.firebaseapp.com"
-                                required
-                            />
-                        </div>
-                         <div className="md:col-span-1">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Storage Bucket</label>
-                            <input 
-                                type="text" 
-                                value={firebaseConfig.storageBucket}
-                                onChange={(e) => setFirebaseConfig({...firebaseConfig, storageBucket: e.target.value})}
-                                className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
-                                placeholder="meupet-3d.appspot.com"
-                            />
-                        </div>
-                        <div className="md:col-span-1">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Messaging Sender ID</label>
-                            <input 
-                                type="text" 
-                                value={firebaseConfig.messagingSenderId}
-                                onChange={(e) => setFirebaseConfig({...firebaseConfig, messagingSenderId: e.target.value})}
-                                className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
-                            />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">App ID</label>
-                            <input 
-                                type="text" 
-                                value={firebaseConfig.appId}
-                                onChange={(e) => setFirebaseConfig({...firebaseConfig, appId: e.target.value})}
-                                className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
-                            />
-                        </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Project URL</label>
+                        <input 
+                            type="text" 
+                            value={supabaseConfig.supabaseUrl}
+                            onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseUrl: e.target.value})}
+                            className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
+                            placeholder="https://xyz.supabase.co"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">API Key (public/anon)</label>
+                        <input 
+                            type="password" 
+                            value={supabaseConfig.supabaseKey}
+                            onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseKey: e.target.value})}
+                            className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
+                            placeholder="eyJxh..."
+                            required
+                        />
                     </div>
 
-                    <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
+                    <div className="pt-4 border-t border-emerald-100/50 flex justify-end gap-3">
                          {isCloudConfigured && (
                             <Button type="button" variant="danger" onClick={handleClearCloudConfig}>
                                 Desconectar
@@ -248,16 +219,45 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                          </Button>
                     </div>
                 </form>
+            </div>
+
+            <div className="bg-slate-800 text-slate-200 p-6 rounded-xl shadow-sm flex flex-col">
+                <div className="flex items-center gap-2 mb-4 text-emerald-400">
+                    <Database className="w-5 h-5" />
+                    <h3 className="font-bold">Setup do Banco de Dados</h3>
+                </div>
                 
-                <div className="mt-6 bg-blue-50 p-4 rounded-lg text-sm text-blue-800 border border-blue-100">
-                    <strong>Como obter esses dados?</strong>
-                    <ol className="list-decimal list-inside mt-2 space-y-1 ml-2">
-                        <li>Acesse o console do Firebase.</li>
-                        <li>Crie um projeto e adicione um App Web.</li>
-                        <li>Nas configurações do projeto, role até o final para ver o "SDK setup and configuration".</li>
-                        <li>Selecione "Config" e copie os valores para cá.</li>
-                        <li>Lembre-se de criar o Banco de Dados (Firestore) no console!</li>
-                    </ol>
+                <p className="text-sm text-slate-400 mb-4">
+                    Para que o sistema funcione, você precisa criar a tabela no editor SQL do Supabase. Copie o código abaixo e execute lá:
+                </p>
+
+                <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
+                    <pre className="text-emerald-300">
+{`CREATE TABLE public.orders (
+  id UUID PRIMARY KEY,
+  "createdAt" TEXT,
+  status TEXT,
+  price NUMERIC,
+  "shippingCost" NUMERIC,
+  "isPaid" BOOLEAN,
+  customer JSONB,
+  products JSONB
+);
+
+-- Habilitar Realtime
+alter publication supabase_realtime add table public.orders;`}
+                    </pre>
+                    <button 
+                        onClick={copySql}
+                        className="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Copiar SQL"
+                    >
+                        <Copy className="w-4 h-4" />
+                    </button>
+                </div>
+                
+                <div className="mt-4 text-xs text-slate-500">
+                   * Não esqueça de desabilitar RLS ou configurar as policies para acesso público se for um app interno simples.
                 </div>
             </div>
         </div>

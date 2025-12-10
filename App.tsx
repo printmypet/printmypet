@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Cloud } from 'lucide-react';
-import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, FirebaseConfig } from './types';
+import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Cloud, Database } from 'lucide-react';
+import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig } from './types';
 import { OrderForm } from './components/OrderForm';
 import { OrderList } from './components/OrderList';
 import { StatsDashboard } from './components/StatsDashboard';
@@ -9,27 +9,26 @@ import { AdminSettings } from './components/AdminSettings';
 import { AdminLogin } from './components/AdminLogin';
 import { Button } from './components/ui/Button';
 import { 
-  initFirebase, 
+  initSupabase, 
   subscribeToOrders, 
-  addOrderToFirebase, 
-  updateOrderStatusInFirebase, 
-  updateOrderPaidInFirebase, 
-  deleteOrderFromFirebase 
-} from './services/firebase';
+  addOrderToSupabase, 
+  updateOrderStatusInSupabase, 
+  updateOrderPaidInSupabase, 
+  deleteOrderFromSupabase 
+} from './services/supabase';
 
 const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [view, setView] = useState<'list' | 'new' | 'admin'>('list');
-  const [isFirebaseEnabled, setIsFirebaseEnabled] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 
-  // Config State - Updated to separate parts
+  // Config State
   const [partsColors, setPartsColors] = useState<PartsColors>(() => {
     const saved = localStorage.getItem('app-parts-colors');
     if (saved) {
       return JSON.parse(saved);
     }
-    // Migration/Fallback: If no specific parts config, use default for all
     return {
       base: [...DEFAULT_COLORS],
       ball: [...DEFAULT_COLORS],
@@ -42,19 +41,19 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : DEFAULT_TEXTURES;
   });
 
-  // Init Firebase and Load Data
+  // Init Supabase and Load Data
   useEffect(() => {
-    const firebaseConfigStr = localStorage.getItem('app-firebase-config');
+    const supabaseConfigStr = localStorage.getItem('app-supabase-config');
     let connected = false;
 
-    if (firebaseConfigStr) {
-      const config: FirebaseConfig = JSON.parse(firebaseConfigStr);
-      connected = initFirebase(config);
-      setIsFirebaseEnabled(connected);
+    if (supabaseConfigStr) {
+      const config: SupabaseConfig = JSON.parse(supabaseConfigStr);
+      connected = initSupabase(config);
+      setIsOnline(connected);
     }
 
     if (connected) {
-      // Subscribe to Cloud Data
+      // Subscribe to Supabase Realtime
       const unsubscribe = subscribeToOrders((cloudOrders) => {
         setOrders(cloudOrders);
       });
@@ -65,18 +64,15 @@ const App: React.FC = () => {
       if (savedOrders) {
         try {
           const parsed = JSON.parse(savedOrders);
-          
-          // Migration: Check if orders have 'product' instead of 'products'
+          // Migration logic for old structure if necessary
           const migratedOrders = parsed.map((order: any) => {
             if (order.products) return order;
-            
-            // Convert old single product to array
             if (order.product) {
               const legacyProduct = { ...order.product, id: uuidv4() };
               return {
                 ...order,
                 products: [legacyProduct],
-                product: undefined // Remove old key
+                product: undefined
               } as Order;
             }
             return order;
@@ -89,14 +85,14 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Save Orders to LocalStorage (Only if Firebase NOT enabled)
+  // Save Orders to LocalStorage (Only if Offline)
   useEffect(() => {
-    if (!isFirebaseEnabled) {
+    if (!isOnline) {
       localStorage.setItem('3d-print-orders', JSON.stringify(orders));
     }
-  }, [orders, isFirebaseEnabled]);
+  }, [orders, isOnline]);
 
-  // Save Config to LocalStorage (New Key)
+  // Save Config to LocalStorage
   useEffect(() => {
     localStorage.setItem('app-parts-colors', JSON.stringify(partsColors));
   }, [partsColors]);
@@ -113,12 +109,11 @@ const App: React.FC = () => {
       status: 'Pendente'
     };
 
-    if (isFirebaseEnabled) {
+    if (isOnline) {
       try {
-        await addOrderToFirebase(newOrder);
-        // We don't need to manually setOrders here because the subscription will trigger
+        await addOrderToSupabase(newOrder);
       } catch (e) {
-        alert("Erro ao salvar no Firebase. Verifique sua conexão.");
+        alert("Erro ao salvar no Supabase. Verifique sua conexão ou configuração.");
         return;
       }
     } else {
@@ -128,24 +123,24 @@ const App: React.FC = () => {
   };
 
   const handleDeleteOrder = async (id: string) => {
-    if (isFirebaseEnabled) {
-       await deleteOrderFromFirebase(id);
+    if (isOnline) {
+       await deleteOrderFromSupabase(id);
     } else {
        setOrders(prev => prev.filter(o => o.id !== id));
     }
   };
 
   const handleUpdateStatus = async (id: string, status: OrderStatus) => {
-    if (isFirebaseEnabled) {
-      await updateOrderStatusInFirebase(id, status);
+    if (isOnline) {
+      await updateOrderStatusInSupabase(id, status);
     } else {
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
     }
   };
 
   const handleUpdatePaid = async (id: string, isPaid: boolean) => {
-    if (isFirebaseEnabled) {
-      await updateOrderPaidInFirebase(id, isPaid);
+    if (isOnline) {
+      await updateOrderPaidInSupabase(id, isPaid);
     } else {
       setOrders(prev => prev.map(o => o.id === id ? { ...o, isPaid } : o));
     }
@@ -153,13 +148,13 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Top Bar for Melhor Envio */}
+      {/* Top Bar */}
       <div className="bg-slate-900 text-white text-xs py-1.5 px-4">
          <div className="max-w-7xl mx-auto flex justify-between items-center">
             <span className="flex items-center gap-2">
-              {isFirebaseEnabled ? (
-                <span className="flex items-center gap-1 text-green-400 font-bold">
-                  <Cloud className="w-3 h-3" /> Online (Firebase)
+              {isOnline ? (
+                <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                  <Database className="w-3 h-3" /> Online (Supabase)
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-slate-400">

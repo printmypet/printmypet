@@ -75,11 +75,17 @@ export interface Order {
   isPaid: boolean;
 }
 
+export interface SupabaseConfig {
+  supabaseUrl: string;
+  supabaseKey: string;
+}
+
 export interface FirebaseConfig {
   apiKey: string;
   authDomain: string;
   projectId: string;
-  storageBucket: string;
-  messagingSenderId: string;
-  appId: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+  measurementId?: string;
 }
