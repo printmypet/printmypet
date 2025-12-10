@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2 } from 'lucide-react';
+import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2, Users } from 'lucide-react';
 import { 
   ColorOption,
   Order, 
@@ -52,6 +52,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   // Customer State
   const [customer, setCustomer] = useState<Omit<Customer, 'address'>>({
     name: '',
+    type: 'final',
+    partnerName: '',
     email: '',
     phone: '',
     cpf: '',
@@ -167,6 +169,72 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     </div>
   );
 
+  // Helper to get SVG Pattern based on texture name
+  const getTexturePattern = (textureName: string) => {
+    const name = textureName.toLowerCase();
+    const color = "rgba(0,0,0,0.4)"; // Dark overlay color
+
+    if (name.includes('hexagonal')) {
+      return (
+        <defs>
+          <pattern id="hex" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="scale(0.8)">
+             <path d="M10 0 L18.66 5 L18.66 15 L10 20 L1.34 15 L1.34 5 Z" fill="none" stroke={color} strokeWidth="1" />
+          </pattern>
+        </defs>
+      );
+    } 
+    else if (name.includes('listrado')) {
+      return (
+        <defs>
+          <pattern id="stripes" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+             <line x1="0" y1="0" x2="0" y2="10" stroke={color} strokeWidth="4" />
+          </pattern>
+        </defs>
+      );
+    }
+    else if (name.includes('pontilhado')) {
+      return (
+         <defs>
+          <pattern id="dots" width="10" height="10" patternUnits="userSpaceOnUse">
+             <circle cx="5" cy="5" r="2" fill={color} />
+          </pattern>
+        </defs>
+      );
+    }
+    else if (name.includes('voronoi')) {
+      return (
+         <defs>
+          <pattern id="voronoi" width="30" height="30" patternUnits="userSpaceOnUse">
+             <path d="M0 0 L10 10 L25 5 L30 15 L20 25 L5 20 Z" fill="none" stroke={color} strokeWidth="1.5" />
+             <path d="M30 0 L20 10 M10 30 L15 20" stroke={color} strokeWidth="1.5" />
+          </pattern>
+        </defs>
+      );
+    }
+    else {
+      // Default / Paws for Custom or Unknown
+      return (
+        <defs>
+          <pattern id="paws" width="30" height="30" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <circle cx="10" cy="10" r="3" fill={color}/>
+            <circle cx="6" cy="6" r="1.5" fill={color}/>
+            <circle cx="14" cy="6" r="1.5" fill={color}/>
+            <circle cx="10" cy="4" r="1.5" fill={color}/>
+          </pattern>
+        </defs>
+      );
+    }
+  };
+
+  const getPatternId = (textureName: string) => {
+    const name = textureName.toLowerCase();
+    if (name.includes('hexagonal')) return 'url(#hex)';
+    if (name.includes('listrado')) return 'url(#stripes)';
+    if (name.includes('pontilhado')) return 'url(#dots)';
+    if (name.includes('voronoi')) return 'url(#voronoi)';
+    return 'url(#paws)';
+  };
+
   return (
     <form onSubmit={handleSubmit} className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="border-b border-slate-200 bg-slate-50 px-6 py-4 flex items-center justify-between">
@@ -175,9 +243,21 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           {step === 1 ? 'Configuração do Produto' : 'Dados do Cliente e Pagamento'}
         </h2>
         <div className="flex items-center gap-2 text-sm text-slate-500">
-          <span className={`px-2 py-1 rounded ${step === 1 ? 'bg-indigo-100 text-indigo-700 font-bold' : ''}`}>Passo 1</span>
+          <button 
+            type="button"
+            onClick={() => setStep(1)}
+            className={`px-2 py-1 rounded transition-colors ${step === 1 ? 'bg-indigo-100 text-indigo-700 font-bold' : 'hover:bg-slate-100 cursor-pointer'}`}
+          >
+            Passo 1
+          </button>
           <span className="text-slate-300">/</span>
-          <span className={`px-2 py-1 rounded ${step === 2 ? 'bg-indigo-100 text-indigo-700 font-bold' : ''}`}>Passo 2</span>
+          <button 
+            type="button"
+            onClick={() => setStep(2)}
+            className={`px-2 py-1 rounded transition-colors ${step === 2 ? 'bg-indigo-100 text-indigo-700 font-bold' : 'hover:bg-slate-100 cursor-pointer'}`}
+          >
+            Passo 2
+          </button>
         </div>
       </div>
 
@@ -378,19 +458,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                       borderRadius: '0 0 10px 10px'
                     }}
                   >
-                    <div className="absolute inset-0 opacity-30 pointer-events-none overflow-hidden">
-                      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                          <pattern id="paws" width="30" height="30" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                            <circle cx="10" cy="10" r="3" fill="rgba(0,0,0,0.5)"/>
-                            <circle cx="6" cy="6" r="1.5" fill="rgba(0,0,0,0.5)"/>
-                            <circle cx="14" cy="6" r="1.5" fill="rgba(0,0,0,0.5)"/>
-                            <circle cx="10" cy="4" r="1.5" fill="rgba(0,0,0,0.5)"/>
-                          </pattern>
-                        </defs>
-                        <rect width="100%" height="100%" fill="url(#paws)" />
-                      </svg>
-                    </div>
+                    {(currentProduct.textureValue && currentProduct.textureValue !== 'Liso') && (
+                      <div className="absolute inset-0 opacity-30 pointer-events-none overflow-hidden">
+                        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                          {getTexturePattern(currentProduct.textureValue)}
+                          <rect width="100%" height="100%" fill={getPatternId(currentProduct.textureValue)} />
+                        </svg>
+                      </div>
+                    )}
                     
                     <span className="relative z-40 text-black font-bold text-sm tracking-wider uppercase drop-shadow-sm">TAMPA</span>
 
@@ -470,8 +545,56 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                <h3 className="text-lg font-medium text-slate-900">Informações de Contato</h3>
             </div>
             
+            <div className="md:col-span-2 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Cliente</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer p-3 border border-slate-200 rounded-lg hover:bg-slate-50 flex-1">
+                  <input 
+                    type="radio" 
+                    name="type"
+                    value="final"
+                    checked={customer.type === 'final'}
+                    onChange={handleCustomerChange}
+                    className="text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-slate-500" />
+                    <span>Cliente Final</span>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer p-3 border border-slate-200 rounded-lg hover:bg-slate-50 flex-1">
+                  <input 
+                    type="radio" 
+                    name="type"
+                    value="partner"
+                    checked={customer.type === 'partner'}
+                    onChange={handleCustomerChange}
+                    className="text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="flex items-center gap-2">
+                     <Users className="w-4 h-4 text-slate-500" />
+                     <span>Parceiro</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {customer.type === 'partner' && (
+              <div className="md:col-span-2 animate-fade-in bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-2">
+                <label className="block text-sm font-medium text-indigo-900 mb-1">Nome da Loja / Parceiro *</label>
+                <input 
+                  type="text"
+                  name="partnerName"
+                  value={customer.partnerName || ''}
+                  onChange={handleCustomerChange}
+                  placeholder="Ex: PetShop AuAu"
+                  className="w-full rounded-lg border-indigo-200 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                />
+              </div>
+            )}
+
             <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo do Cliente *</label>
               <input 
                 type="text"
                 name="name"
@@ -648,15 +771,17 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           <Button 
             type="button" 
             onClick={() => setStep(2)}
+          >
+            Próximo: Dados do Cliente {cartItems.length > 0 ? `(${cartItems.length} itens)` : ''}
+          </Button>
+        ) : (
+          <Button 
+            type="submit"
             disabled={cartItems.length === 0}
             className={cartItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
           >
-            {cartItems.length === 0 ? 'Adicione um item para continuar' : `Próximo: Dados do Cliente (${cartItems.length} itens)`}
-          </Button>
-        ) : (
-          <Button type="submit">
             <Save className="w-4 h-4 mr-2" />
-            Salvar Pedido ({cartItems.length} itens)
+            {cartItems.length === 0 ? 'Adicione itens para Salvar' : `Salvar Pedido (${cartItems.length} itens)`}
           </Button>
         )}
       </div>

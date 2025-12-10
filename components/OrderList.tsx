@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram } from 'lucide-react';
+import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter } from 'lucide-react';
 import { Order, OrderStatus } from '../types';
 import { Button } from './ui/Button';
 
@@ -18,14 +18,31 @@ const statusColors: Record<OrderStatus, string> = {
   'Entregue': 'bg-slate-100 text-slate-800 border-slate-200',
 };
 
+type FilterType = 'open' | 'completed' | 'all';
+
 export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, onUpdatePaid, onDelete }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<FilterType>('open');
 
-  const filteredOrders = orders.filter(order => 
-    order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.customer.cpf.includes(searchTerm) ||
-    order.id.includes(searchTerm)
-  );
+  const filteredOrders = orders.filter(order => {
+    // 1. Text Search Filter
+    const matchesSearch = 
+      order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.customer.cpf.includes(searchTerm) ||
+      order.id.includes(searchTerm) ||
+      order.customer.partnerName?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // 2. Status Category Filter
+    let matchesStatus = true;
+    if (filterType === 'open') {
+      matchesStatus = ['Pendente', 'Em Impressão', 'Acabamento'].includes(order.status);
+    } else if (filterType === 'completed') {
+      matchesStatus = ['Concluído', 'Entregue'].includes(order.status);
+    }
+    // if 'all', matchesStatus remains true
+
+    return matchesSearch && matchesStatus;
+  });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -33,18 +50,57 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">
-          Pedidos Recentes ({orders.length})
-        </h2>
-        <div className="relative w-full md:w-96">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <h2 className="text-2xl font-bold text-slate-800">
+            Gerenciamento de Pedidos
+          </h2>
+          
+          <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200 self-start md:self-auto">
+            <button
+              onClick={() => setFilterType('open')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                filterType === 'open' 
+                  ? 'bg-white text-indigo-600 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              Em Aberto
+            </button>
+            <button
+              onClick={() => setFilterType('completed')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                filterType === 'completed' 
+                  ? 'bg-white text-green-600 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <CheckCircle className="w-4 h-4" />
+              Concluídos
+            </button>
+            <button
+              onClick={() => setFilterType('all')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                filterType === 'all' 
+                  ? 'bg-white text-slate-800 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <ListFilter className="w-4 h-4" />
+              Todos
+            </button>
+          </div>
+        </div>
+
+        <div className="relative w-full">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-slate-400" />
           </div>
           <input
             type="text"
-            placeholder="Buscar por nome, CPF ou ID..."
-            className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+            placeholder="Buscar por nome, CPF, parceiro ou ID..."
+            className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -52,13 +108,22 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
       </div>
 
       {filteredOrders.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
-          <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
+          <Package className="w-16 h-16 text-slate-200 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-slate-900">Nenhum pedido encontrado</h3>
-          <p className="text-slate-500">Tente ajustar sua busca ou adicione um novo pedido.</p>
+          <p className="text-slate-500 max-w-sm mx-auto mt-1">
+            {searchTerm 
+              ? `Não encontramos resultados para "${searchTerm}" no filtro selecionado.` 
+              : filterType === 'open' 
+                ? "Não há pedidos pendentes no momento. Bom trabalho!" 
+                : "Ainda não há pedidos nesta categoria."}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6">
+          <div className="text-sm text-slate-500 font-medium">
+            Mostrando {filteredOrders.length} pedido(s) {filterType === 'open' ? 'em aberto' : filterType === 'completed' ? 'concluídos' : ''}
+          </div>
           {filteredOrders.map(order => (
             <div key={order.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
               <div className="p-6">
@@ -69,6 +134,12 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusColors[order.status]}`}>
                         {order.status}
                       </span>
+                      {order.customer.type === 'partner' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {order.customer.partnerName || 'Parceiro'}
+                        </span>
+                      )}
                     </div>
                     <div className="text-sm text-slate-500 flex flex-wrap gap-4">
                       <span className="flex items-center gap-1"><FileText className="w-3 h-3" /> CPF: {order.customer.cpf}</span>
@@ -81,7 +152,7 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                      <select 
                       value={order.status}
                       onChange={(e) => onUpdateStatus(order.id, e.target.value as OrderStatus)}
-                      className="text-sm border-slate-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      className="text-sm border-slate-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 cursor-pointer"
                      >
                        <option value="Pendente">Pendente</option>
                        <option value="Em Impressão">Em Impressão</option>

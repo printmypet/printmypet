@@ -1,3 +1,4 @@
+
 export type ColorOption = {
   name: string;
   hex: string;
@@ -38,6 +39,9 @@ export interface Customer {
   phone: string;
   cpf: string;
   instagram?: string;
+  // New fields for Partner/Final Customer logic
+  type: 'final' | 'partner';
+  partnerName?: string;
   // Address fields
   address: string; // Full formatted address for display
   zipCode?: string;
