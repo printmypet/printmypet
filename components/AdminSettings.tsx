@@ -16,7 +16,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   onUpdatePartsColors, 
   onUpdateTextures 
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'cloud'>('products');
+  // Automatically select 'cloud' tab if not configured
+  const [activeTab, setActiveTab] = useState<'products' | 'cloud'>(() => {
+    return localStorage.getItem('app-supabase-config') ? 'products' : 'cloud';
+  });
   
   // Local state for product config
   const [activePart, setActivePart] = useState<keyof PartsColors>('base');

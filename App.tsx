@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Cloud, Database } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Cloud, Database, AlertCircle } from 'lucide-react';
 import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig } from './types';
 import { OrderForm } from './components/OrderForm';
 import { OrderList } from './components/OrderList';
@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<'list' | 'new' | 'admin'>('list');
   const [isOnline, setIsOnline] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [showSetupBanner, setShowSetupBanner] = useState(false);
 
   // Config State
   const [partsColors, setPartsColors] = useState<PartsColors>(() => {
@@ -50,6 +51,8 @@ const App: React.FC = () => {
       const config: SupabaseConfig = JSON.parse(supabaseConfigStr);
       connected = initSupabase(config);
       setIsOnline(connected);
+    } else {
+      setShowSetupBanner(true);
     }
 
     if (connected) {
@@ -173,6 +176,24 @@ const App: React.FC = () => {
          </div>
       </div>
 
+      {/* Setup Banner */}
+      {showSetupBanner && !isOnline && view !== 'admin' && (
+        <div className="bg-indigo-600 text-white px-4 py-3 shadow-md relative z-40">
+           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <span className="text-sm font-medium">O sistema está rodando em modo offline. Conecte ao Supabase para sincronizar pedidos.</span>
+              </div>
+              <button 
+                onClick={() => setView('admin')} 
+                className="bg-white text-indigo-700 px-4 py-1.5 rounded-full text-xs font-bold hover:bg-indigo-50 transition-colors whitespace-nowrap"
+              >
+                Configurar Nuvem Agora
+              </button>
+           </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -204,7 +225,7 @@ const App: React.FC = () => {
                 variant={view === 'admin' ? 'secondary' : 'outline'} 
                 onClick={() => setView('admin')}
                 className={view === 'admin' ? 'bg-slate-100' : ''}
-                title="Configurações"
+                title="Configurações e Login"
               >
                 <Settings className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Admin</span>
