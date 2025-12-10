@@ -1,16 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { LayoutDashboard, PlusCircle, Settings, ExternalLink } from 'lucide-react';
-import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES } from './types';
+import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Cloud } from 'lucide-react';
+import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, FirebaseConfig } from './types';
 import { OrderForm } from './components/OrderForm';
 import { OrderList } from './components/OrderList';
 import { StatsDashboard } from './components/StatsDashboard';
 import { AdminSettings } from './components/AdminSettings';
+import { AdminLogin } from './components/AdminLogin';
 import { Button } from './components/ui/Button';
+import { 
+  initFirebase, 
+  subscribeToOrders, 
+  addOrderToFirebase, 
+  updateOrderStatusInFirebase, 
+  updateOrderPaidInFirebase, 
+  deleteOrderFromFirebase 
+} from './services/firebase';
 
 const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [view, setView] = useState<'list' | 'new' | 'admin'>('list');
+  const [isFirebaseEnabled, setIsFirebaseEnabled] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 
   // Config State - Updated to separate parts
   const [partsColors, setPartsColors] = useState<PartsColors>(() => {
@@ -31,40 +42,59 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : DEFAULT_TEXTURES;
   });
 
-  // Load Orders from LocalStorage with MIGRATION logic
+  // Init Firebase and Load Data
   useEffect(() => {
-    const savedOrders = localStorage.getItem('3d-print-orders');
-    if (savedOrders) {
-      try {
-        const parsed = JSON.parse(savedOrders);
-        
-        // Migration: Check if orders have 'product' instead of 'products'
-        const migratedOrders = parsed.map((order: any) => {
-          if (order.products) return order;
-          
-          // Convert old single product to array
-          if (order.product) {
-            const legacyProduct = { ...order.product, id: uuidv4() };
-            return {
-              ...order,
-              products: [legacyProduct],
-              product: undefined // Remove old key
-            } as Order;
-          }
-          return order;
-        });
+    const firebaseConfigStr = localStorage.getItem('app-firebase-config');
+    let connected = false;
 
-        setOrders(migratedOrders);
-      } catch (e) {
-        console.error("Failed to parse orders", e);
+    if (firebaseConfigStr) {
+      const config: FirebaseConfig = JSON.parse(firebaseConfigStr);
+      connected = initFirebase(config);
+      setIsFirebaseEnabled(connected);
+    }
+
+    if (connected) {
+      // Subscribe to Cloud Data
+      const unsubscribe = subscribeToOrders((cloudOrders) => {
+        setOrders(cloudOrders);
+      });
+      return () => unsubscribe();
+    } else {
+      // Fallback to Local Storage
+      const savedOrders = localStorage.getItem('3d-print-orders');
+      if (savedOrders) {
+        try {
+          const parsed = JSON.parse(savedOrders);
+          
+          // Migration: Check if orders have 'product' instead of 'products'
+          const migratedOrders = parsed.map((order: any) => {
+            if (order.products) return order;
+            
+            // Convert old single product to array
+            if (order.product) {
+              const legacyProduct = { ...order.product, id: uuidv4() };
+              return {
+                ...order,
+                products: [legacyProduct],
+                product: undefined // Remove old key
+              } as Order;
+            }
+            return order;
+          });
+          setOrders(migratedOrders);
+        } catch (e) {
+          console.error("Failed to parse orders", e);
+        }
       }
     }
   }, []);
 
-  // Save Orders to LocalStorage
+  // Save Orders to LocalStorage (Only if Firebase NOT enabled)
   useEffect(() => {
-    localStorage.setItem('3d-print-orders', JSON.stringify(orders));
-  }, [orders]);
+    if (!isFirebaseEnabled) {
+      localStorage.setItem('3d-print-orders', JSON.stringify(orders));
+    }
+  }, [orders, isFirebaseEnabled]);
 
   // Save Config to LocalStorage (New Key)
   useEffect(() => {
@@ -75,34 +105,68 @@ const App: React.FC = () => {
     localStorage.setItem('app-textures', JSON.stringify(availableTextures));
   }, [availableTextures]);
 
-  const handleSaveOrder = (newOrderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
+  const handleSaveOrder = async (newOrderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
     const newOrder: Order = {
       ...newOrderData,
       id: uuidv4(),
       createdAt: new Date().toISOString(),
       status: 'Pendente'
     };
-    setOrders(prev => [newOrder, ...prev]);
+
+    if (isFirebaseEnabled) {
+      try {
+        await addOrderToFirebase(newOrder);
+        // We don't need to manually setOrders here because the subscription will trigger
+      } catch (e) {
+        alert("Erro ao salvar no Firebase. Verifique sua conexão.");
+        return;
+      }
+    } else {
+      setOrders(prev => [newOrder, ...prev]);
+    }
     setView('list');
   };
 
-  const handleDeleteOrder = (id: string) => {
-    setOrders(prev => prev.filter(o => o.id !== id));
+  const handleDeleteOrder = async (id: string) => {
+    if (isFirebaseEnabled) {
+       await deleteOrderFromFirebase(id);
+    } else {
+       setOrders(prev => prev.filter(o => o.id !== id));
+    }
   };
 
-  const handleUpdateStatus = (id: string, status: OrderStatus) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+  const handleUpdateStatus = async (id: string, status: OrderStatus) => {
+    if (isFirebaseEnabled) {
+      await updateOrderStatusInFirebase(id, status);
+    } else {
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    }
   };
 
-  const handleUpdatePaid = (id: string, isPaid: boolean) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, isPaid } : o));
+  const handleUpdatePaid = async (id: string, isPaid: boolean) => {
+    if (isFirebaseEnabled) {
+      await updateOrderPaidInFirebase(id, isPaid);
+    } else {
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, isPaid } : o));
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Top Bar for Melhor Envio */}
       <div className="bg-slate-900 text-white text-xs py-1.5 px-4">
-         <div className="max-w-7xl mx-auto flex justify-end">
+         <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <span className="flex items-center gap-2">
+              {isFirebaseEnabled ? (
+                <span className="flex items-center gap-1 text-green-400 font-bold">
+                  <Cloud className="w-3 h-3" /> Online (Firebase)
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-slate-400">
+                   Modo Local (Offline)
+                </span>
+              )}
+            </span>
             <a 
               href="https://melhorenvio.com.br/" 
               target="_blank" 
@@ -185,12 +249,16 @@ const App: React.FC = () => {
         )}
 
         {view === 'admin' && (
-          <AdminSettings 
-            partsColors={partsColors}
-            textures={availableTextures}
-            onUpdatePartsColors={setPartsColors}
-            onUpdateTextures={setAvailableTextures}
-          />
+          isAdminAuthenticated ? (
+            <AdminSettings 
+              partsColors={partsColors}
+              textures={availableTextures}
+              onUpdatePartsColors={setPartsColors}
+              onUpdateTextures={setAvailableTextures}
+            />
+          ) : (
+            <AdminLogin onLogin={() => setIsAdminAuthenticated(true)} />
+          )
         )}
       </main>
 

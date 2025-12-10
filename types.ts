@@ -70,6 +70,16 @@ export interface Order {
   customer: Customer;
   products: ProductConfig[]; // Changed from single product to array
   status: OrderStatus;
-  price: number;
+  price: number; // Total Value (Products + Shipping)
+  shippingCost?: number; // Shipping Value component
   isPaid: boolean;
+}
+
+export interface FirebaseConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
 }

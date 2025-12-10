@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2, Users } from 'lucide-react';
+import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2, Users, Truck } from 'lucide-react';
 import { 
   ColorOption,
   Order, 
@@ -43,9 +43,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   // State to control visibility of dog name input
   const [showDogNameInput, setShowDogNameInput] = useState(false);
 
-  // Price handling
-  const [priceRaw, setPriceRaw] = useState<number>(0); // Stores cents
-  const [priceDisplay, setPriceDisplay] = useState<string>(''); // Stores formatted string
+  // Price handling - Separated into Products and Shipping
+  const [productsPriceRaw, setProductsPriceRaw] = useState<number>(0); // Stores cents
+  const [productsPriceDisplay, setProductsPriceDisplay] = useState<string>(''); // Stores formatted string
+  
+  const [shippingPriceRaw, setShippingPriceRaw] = useState<number>(0); // Stores cents
+  const [shippingPriceDisplay, setShippingPriceDisplay] = useState<string>(''); // Stores formatted string
 
   const [isPaid, setIsPaid] = useState<boolean>(false);
 
@@ -132,18 +135,35 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     setCustomer(prev => ({ ...prev, cpf: value }));
   };
 
-  // Currency Mask
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Currency Handlers
+  const handleProductsPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, ''); // Get only numbers
     const cents = parseInt(value, 10) || 0;
-    setPriceRaw(cents);
+    setProductsPriceRaw(cents);
 
     const formatted = (cents / 100).toLocaleString('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     });
-    setPriceDisplay(formatted);
+    setProductsPriceDisplay(formatted);
   };
+
+  const handleShippingPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ''); // Get only numbers
+    const cents = parseInt(value, 10) || 0;
+    setShippingPriceRaw(cents);
+
+    const formatted = (cents / 100).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
+    setShippingPriceDisplay(formatted);
+  };
+
+  // Calculate Total
+  const totalRaw = productsPriceRaw + shippingPriceRaw;
+  const totalDisplay = (totalRaw / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +177,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         address: fullAddress
       },
       products: cartItems, // Send the list of products
-      price: priceRaw / 100, // Convert cents to float
+      price: totalRaw / 100, // Total Value
+      shippingCost: shippingPriceRaw / 100, // Shipping Component
       isPaid
     });
   };
@@ -529,20 +550,39 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                <h3 className="text-lg font-medium text-slate-900">Financeiro ({cartItems.length} itens no pedido)</h3>
             </div>
 
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total do Pedido (R$)</label>
-              <input 
-                type="text"
-                inputMode="numeric"
-                value={priceDisplay}
-                onChange={handlePriceChange}
-                className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium text-lg"
-                placeholder="R$ 0,00"
-              />
-              <p className="text-xs text-slate-400 mt-1">Digite apenas os números, a formatação é automática.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:col-span-2 mb-2">
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor dos Produtos</label>
+                    <input 
+                        type="text"
+                        inputMode="numeric"
+                        value={productsPriceDisplay}
+                        onChange={handleProductsPriceChange}
+                        className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium"
+                        placeholder="R$ 0,00"
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor do Frete</label>
+                    <input 
+                        type="text"
+                        inputMode="numeric"
+                        value={shippingPriceDisplay}
+                        onChange={handleShippingPriceChange}
+                        className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium"
+                        placeholder="R$ 0,00"
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total (Automático)</label>
+                    <div className="w-full rounded-lg border border-slate-200 bg-slate-100 p-2 font-bold text-lg text-slate-900 flex items-center justify-between">
+                         <span>{totalDisplay}</span>
+                         {totalRaw > 0 && <span className="text-xs font-normal text-slate-500">Calculado</span>}
+                    </div>
+                </div>
             </div>
 
-            <div className="md:col-span-1 flex items-end pb-4">
+            <div className="md:col-span-2 flex items-end pb-4 border-b border-slate-100 mb-2">
               <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg w-full bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors h-[46px]">
                 <input 
                   type="checkbox"
@@ -550,11 +590,11 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   onChange={(e) => setIsPaid(e.target.checked)}
                   className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
                 />
-                <span className="font-medium text-slate-900">Pedido Pago?</span>
+                <span className="font-medium text-slate-900">Pedido já foi Pago?</span>
               </label>
             </div>
 
-            <div className="md:col-span-2 mt-4 flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
+            <div className="md:col-span-2 mt-2 flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
                <User className="w-5 h-5 text-indigo-600" />
                <h3 className="text-lg font-medium text-slate-900">Informações de Contato</h3>
             </div>

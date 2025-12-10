@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter } from 'lucide-react';
+import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck } from 'lucide-react';
 import { Order, OrderStatus } from '../types';
 import { Button } from './ui/Button';
 
@@ -270,9 +270,17 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                       <DollarSign className="w-4 h-4 text-green-600"/> Financeiro
                     </h4>
                     <div className="bg-white border border-slate-100 rounded-lg p-4 space-y-4 shadow-sm">
-                      <div className="flex justify-between items-end">
-                         <span className="text-slate-500 text-sm">Valor Total</span>
-                         <span className="text-xl font-bold text-slate-900">{formatCurrency(order.price || 0)}</span>
+                      <div className="flex flex-col gap-1">
+                         <div className="flex justify-between items-end">
+                            <span className="text-slate-500 text-sm">Valor Total</span>
+                            <span className="text-xl font-bold text-slate-900">{formatCurrency(order.price || 0)}</span>
+                         </div>
+                         {order.shippingCost !== undefined && order.shippingCost > 0 && (
+                            <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-100 pt-1 mt-1">
+                                <span className="flex items-center gap-1"><Truck className="w-3 h-3"/> Frete incluso</span>
+                                <span>{formatCurrency(order.shippingCost)}</span>
+                            </div>
+                         )}
                       </div>
                       
                       <div 
