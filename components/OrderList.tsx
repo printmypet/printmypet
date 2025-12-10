@@ -98,47 +98,40 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4 border-t border-slate-100">
-                  {/* Product Details */}
+                  {/* Product Details (Iterate over items) */}
                   <div className="lg:col-span-1">
                     <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-3 flex items-center gap-2">
-                      <Package className="w-4 h-4 text-indigo-500"/> Detalhes do Produto
+                      <Package className="w-4 h-4 text-indigo-500"/> Itens do Pedido ({order.products.length})
                     </h4>
-                    <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Base (Parte 1):</span>
-                        <span className="flex items-center gap-2">
-                           <span className="w-3 h-3 rounded-full border border-slate-300" style={{backgroundColor: order.product.part1Color}}></span>
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Bola (Parte 2):</span>
-                        <span className="flex items-center gap-2">
-                           <span className="w-3 h-3 rounded-full border border-slate-300" style={{backgroundColor: order.product.part2Color}}></span>
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Topo (Parte 3):</span>
-                        <span className="flex items-center gap-2">
-                           <span className="w-3 h-3 rounded-full border border-slate-300" style={{backgroundColor: order.product.part3Color}}></span>
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between border-t border-slate-200 pt-2 mt-2">
-                        <span className="text-slate-600">Textura:</span>
-                        <span className="font-medium text-slate-800">{order.product.textureValue} <span className="text-xs text-slate-400">({order.product.textureType})</span></span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Nome do Pet:</span>
-                        <span className="font-medium text-indigo-600">{order.product.dogName || '-'}</span>
-                      </div>
-                      
-                      {order.product.observations && (
-                         <div className="pt-2 mt-2 border-t border-slate-200">
-                           <span className="block text-slate-600 mb-1 text-xs uppercase">Observações:</span>
-                           <p className="text-slate-800 bg-white p-2 rounded border border-slate-100 italic">
-                             {order.product.observations}
-                           </p>
-                         </div>
-                      )}
+                    
+                    <div className="space-y-3">
+                        {order.products.map((product, idx) => (
+                            <div key={idx} className="bg-slate-50 rounded-lg p-3 text-sm border border-slate-100">
+                                <div className="font-medium text-indigo-900 mb-2 border-b border-slate-200 pb-1 flex justify-between">
+                                    <span>Item #{idx + 1}</span>
+                                    {product.dogName && <span className="text-indigo-600">{product.dogName}</span>}
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-500 text-xs">Cores:</span>
+                                        <div className="flex gap-1">
+                                            <div className="w-3 h-3 rounded-full border border-slate-300" style={{backgroundColor: product.part1Color}} title="Base"></div>
+                                            <div className="w-3 h-3 rounded-full border border-slate-300" style={{backgroundColor: product.part2Color}} title="Bola"></div>
+                                            <div className="w-3 h-3 rounded-full border border-slate-300" style={{backgroundColor: product.part3Color}} title="Topo"></div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-500 text-xs">Textura:</span>
+                                        <span className="text-slate-800 text-xs">{product.textureValue}</span>
+                                    </div>
+                                    {product.observations && (
+                                        <div className="text-xs text-slate-500 italic mt-1 pt-1 border-t border-slate-200">
+                                            "{product.observations}"
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                   </div>
 

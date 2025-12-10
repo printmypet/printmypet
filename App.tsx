@@ -31,12 +31,30 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : DEFAULT_TEXTURES;
   });
 
-  // Load Orders from LocalStorage
+  // Load Orders from LocalStorage with MIGRATION logic
   useEffect(() => {
     const savedOrders = localStorage.getItem('3d-print-orders');
     if (savedOrders) {
       try {
-        setOrders(JSON.parse(savedOrders));
+        const parsed = JSON.parse(savedOrders);
+        
+        // Migration: Check if orders have 'product' instead of 'products'
+        const migratedOrders = parsed.map((order: any) => {
+          if (order.products) return order;
+          
+          // Convert old single product to array
+          if (order.product) {
+            const legacyProduct = { ...order.product, id: uuidv4() };
+            return {
+              ...order,
+              products: [legacyProduct],
+              product: undefined // Remove old key
+            } as Order;
+          }
+          return order;
+        });
+
+        setOrders(migratedOrders);
       } catch (e) {
         console.error("Failed to parse orders", e);
       }
@@ -143,7 +161,7 @@ const App: React.FC = () => {
           <div className="animate-fade-in-up">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-slate-900">Novo Pedido de Impressão</h2>
-              <p className="text-slate-500">Configure o produto e adicione os dados do cliente.</p>
+              <p className="text-slate-500">Adicione um ou mais produtos ao pedido e preencha os dados do cliente.</p>
             </div>
             <OrderForm 
               onSave={handleSaveOrder} 

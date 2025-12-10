@@ -15,10 +15,12 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({ orders }) => {
     { name: 'Concluído', count: orders.filter(o => o.status === 'Concluído').length, color: '#4ADE80' },
   ];
 
-  // Calculate texture popularity
+  // Calculate texture popularity (Iterating through all products in all orders)
   const textureCounts = orders.reduce((acc, order) => {
-    const type = order.product.textureType === 'cadastrada' ? 'Padrão' : 'Custom';
-    acc[type] = (acc[type] || 0) + 1;
+    order.products.forEach(product => {
+        const type = product.textureType === 'cadastrada' ? 'Padrão' : 'Custom';
+        acc[type] = (acc[type] || 0) + 1;
+    });
     return acc;
   }, {} as Record<string, number>);
 
@@ -52,7 +54,7 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({ orders }) => {
       </div>
 
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">Tipos de Textura</h3>
+        <h3 className="text-lg font-bold text-slate-800 mb-4">Tipos de Textura (Total de Itens)</h3>
         <div className="h-64">
            <ResponsiveContainer width="100%" height="100%">
             <PieChart>

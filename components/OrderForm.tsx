@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Save, User, Box, Layers, Palette, DollarSign } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2 } from 'lucide-react';
 import { 
   ColorOption,
   Order, 
@@ -24,8 +25,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
   
-  // Initialize with first available options or fallbacks
-  const [product, setProduct] = useState<ProductConfig>({
+  // List of added products for the order
+  const [cartItems, setCartItems] = useState<ProductConfig[]>([]);
+
+  // Current product being configured
+  const [currentProduct, setCurrentProduct] = useState<ProductConfig>({
+    id: uuidv4(),
     part1Color: partsColors.base[0]?.hex || '#000000',
     part2Color: partsColors.ball[0]?.hex || '#000000',
     part3Color: partsColors.top[0]?.hex || '#000000',
@@ -38,20 +43,54 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   // State to control visibility of dog name input
   const [showDogNameInput, setShowDogNameInput] = useState(false);
 
-  const [price, setPrice] = useState<string>('');
+  // Price handling
+  const [priceRaw, setPriceRaw] = useState<number>(0); // Stores cents
+  const [priceDisplay, setPriceDisplay] = useState<string>(''); // Stores formatted string
+
   const [isPaid, setIsPaid] = useState<boolean>(false);
 
-  const [customer, setCustomer] = useState<Customer>({
+  // Customer State
+  const [customer, setCustomer] = useState<Omit<Customer, 'address'>>({
     name: '',
-    address: '',
     email: '',
     phone: '',
     cpf: '',
-    instagram: ''
+    instagram: '',
+    zipCode: '',
+    street: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: '',
+    state: ''
   });
 
+  // --- Handlers ---
+
   const handleProductChange = (key: keyof ProductConfig, value: string) => {
-    setProduct(prev => ({ ...prev, [key]: value }));
+    setCurrentProduct(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleAddToCart = () => {
+    setCartItems(prev => [...prev, currentProduct]);
+    
+    // Reset form for next item but keep some defaults logic if needed, 
+    // or just reset to initial state with new ID
+    setCurrentProduct({
+        id: uuidv4(),
+        part1Color: partsColors.base[0]?.hex || '#000000',
+        part2Color: partsColors.ball[0]?.hex || '#000000',
+        part3Color: partsColors.top[0]?.hex || '#000000',
+        textureType: 'cadastrada',
+        textureValue: availableTextures[0] || '',
+        dogName: '',
+        observations: ''
+    });
+    setShowDogNameInput(false);
+  };
+
+  const handleRemoveFromCart = (id: string) => {
+    setCartItems(prev => prev.filter(item => item.id !== id));
   };
 
   const handleCustomerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,12 +98,50 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     setCustomer(prev => ({ ...prev, [name]: value }));
   };
 
+  // Phone Mask
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+    
+    // Limit length
+    if (value.length > 11) value = value.slice(0, 11);
+
+    // Apply mask (00) 00000-0000
+    if (value.length > 2) {
+      value = `(${value.slice(0, 2)}) ${value.slice(2)}`;
+    }
+    if (value.length > 9) {
+      value = `${value.slice(0, 9)}-${value.slice(9)}`;
+    } // (11) 99999-9999 is 15 chars
+
+    setCustomer(prev => ({ ...prev, phone: value }));
+  };
+
+  // Currency Mask
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ''); // Get only numbers
+    const cents = parseInt(value, 10) || 0;
+    setPriceRaw(cents);
+
+    const formatted = (cents / 100).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
+    setPriceDisplay(formatted);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Construct full address string for display compatibility
+    const fullAddress = `${customer.street}, ${customer.number}${customer.complement ? ` - ${customer.complement}` : ''} - ${customer.neighborhood}, ${customer.city} - ${customer.state}, ${customer.zipCode}`;
+
     onSave({ 
-      customer, 
-      product,
-      price: parseFloat(price.replace(',', '.')) || 0,
+      customer: {
+        ...customer,
+        address: fullAddress
+      },
+      products: cartItems, // Send the list of products
+      price: priceRaw / 100, // Convert cents to float
       isPaid
     });
   };
@@ -106,217 +183,250 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
       <div className="p-6">
         {step === 1 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-slate-900 mb-4 flex items-center gap-2">
-                  <Palette className="w-4 h-4"/> Cores das Partes
-                </h3>
-                <ColorPicker 
-                  label="Parte 1 (Base)" 
-                  options={partsColors.base}
-                  selected={product.part1Color} 
-                  onChange={(c) => handleProductChange('part1Color', c)} 
-                />
-                <ColorPicker 
-                  label="Parte 2 (Bola)" 
-                  options={partsColors.ball}
-                  selected={product.part2Color} 
-                  onChange={(c) => handleProductChange('part2Color', c)} 
-                />
-                <ColorPicker 
-                  label="Parte 3 (Detalhes/Topo)" 
-                  options={partsColors.top}
-                  selected={product.part3Color} 
-                  onChange={(c) => handleProductChange('part3Color', c)} 
-                />
-              </div>
-
-              <div className="pt-4 border-t border-slate-100">
-                <h3 className="text-lg font-medium text-slate-900 mb-4 flex items-center gap-2">
-                  <Layers className="w-4 h-4"/> Textura e Personalização
-                </h3>
-                
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Textura (Parte 3)</label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="textureType"
-                        checked={product.textureType === 'cadastrada'}
-                        onChange={() => handleProductChange('textureType', 'cadastrada')}
-                        className="text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span>Padrão</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="textureType"
-                        checked={product.textureType === 'personalizada'}
-                        onChange={() => {
-                          handleProductChange('textureType', 'personalizada');
-                          handleProductChange('textureValue', '');
-                        }}
-                        className="text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span>Personalizada</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  {product.textureType === 'cadastrada' ? (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Selecione a Textura</label>
-                      <select 
-                        className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                        value={product.textureValue}
-                        onChange={(e) => handleProductChange('textureValue', e.target.value)}
-                      >
-                        {availableTextures.length === 0 && <option value="">Nenhuma textura cadastrada</option>}
-                        {availableTextures.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
+          <div className="space-y-8">
+            {/* Added Items List (Cart) */}
+            {cartItems.length > 0 && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                    <h3 className="text-sm font-bold text-indigo-900 uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <ShoppingCart className="w-4 h-4"/> Itens no Pedido ({cartItems.length})
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {cartItems.map((item, index) => (
+                            <div key={item.id} className="bg-white p-3 rounded-lg border border-indigo-100 flex items-center justify-between shadow-sm">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex gap-1">
+                                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{backgroundColor: item.part1Color}} title="Base"></div>
+                                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{backgroundColor: item.part2Color}} title="Bola"></div>
+                                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{backgroundColor: item.part3Color}} title="Topo"></div>
+                                    </div>
+                                    <div className="text-sm">
+                                        <span className="font-medium text-slate-900 block">Item #{index + 1} {item.dogName ? `- ${item.dogName}` : ''}</span>
+                                        <span className="text-xs text-slate-500">{item.textureValue}</span>
+                                    </div>
+                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={() => handleRemoveFromCart(item.id)}
+                                    className="text-slate-400 hover:text-red-500 p-1"
+                                    title="Remover item"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
                     </div>
-                  ) : (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Descreva a Textura</label>
-                      <input 
-                        type="text"
-                        required
-                        className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                        placeholder="Ex: Escamas de dragão, Floral..."
-                        value={product.textureValue}
-                        onChange={(e) => handleProductChange('textureValue', e.target.value)}
-                      />
-                    </div>
-                  )}
                 </div>
+            )}
 
-                <div className="mb-4">
-                  <div className="flex items-center gap-4 mb-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-0">Gravar nome do cachorrinho?</label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newState = !showDogNameInput;
-                        setShowDogNameInput(newState);
-                        // If turning off, clear the name
-                        if (!newState) {
-                          handleProductChange('dogName', '');
-                        }
-                      }}
-                      className={`px-4 py-1 rounded-full text-xs font-bold transition-all border ${
-                        showDogNameInput 
-                          ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-200' 
-                          : 'bg-white text-slate-400 border-slate-300 hover:border-indigo-300'
-                      }`}
-                    >
-                      SIM
-                    </button>
-                  </div>
-                  
-                  {showDogNameInput && (
-                    <input 
-                      type="text"
-                      className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white animate-fade-in"
-                      placeholder="Nome para gravar na peça"
-                      value={product.dogName}
-                      onChange={(e) => handleProductChange('dogName', e.target.value)}
-                    />
-                  )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
+              {/* Configuration Form */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <Plus className="w-5 h-5 text-indigo-600"/>
+                    <h3 className="font-medium text-slate-900">Configurar Novo Item</h3>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-                  <textarea 
-                    rows={3}
-                    className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none bg-white"
-                    placeholder="Ex: Detalhes específicos sobre a montagem, cuidados, etc..."
-                    value={product.observations}
-                    onChange={(e) => handleProductChange('observations', e.target.value)}
+                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Cores das Partes</h4>
+                  <ColorPicker 
+                    label="Parte 1 (Base)" 
+                    options={partsColors.base}
+                    selected={currentProduct.part1Color} 
+                    onChange={(c) => handleProductChange('part1Color', c)} 
+                  />
+                  <ColorPicker 
+                    label="Parte 2 (Bola)" 
+                    options={partsColors.ball}
+                    selected={currentProduct.part2Color} 
+                    onChange={(c) => handleProductChange('part2Color', c)} 
+                  />
+                  <ColorPicker 
+                    label="Parte 3 (Detalhes/Topo)" 
+                    options={partsColors.top}
+                    selected={currentProduct.part3Color} 
+                    onChange={(c) => handleProductChange('part3Color', c)} 
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* Visualizer */}
-            <div className="bg-slate-100 rounded-xl p-8 flex flex-col items-center justify-center border border-slate-200">
-              <h4 className="text-slate-500 font-medium mb-12 uppercase tracking-wider text-sm">Pré-visualização Esquemática</h4>
-              <div className="relative flex flex-col items-center">
-                
-                {/* Part 3 (Top) - Cone shape with Paws */}
-                <div 
-                  className="w-40 h-24 relative z-30 mb-[-16px] transition-colors duration-300 flex items-center justify-center shadow-lg"
-                  style={{ 
-                    backgroundColor: product.part3Color,
-                    clipPath: 'polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)',
-                    borderRadius: '0 0 10px 10px'
-                  }}
-                >
-                  {/* Decorative Paw Pattern Overlay */}
-                  <div className="absolute inset-0 opacity-30 pointer-events-none overflow-hidden">
-                    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                      <defs>
-                        <pattern id="paws" width="30" height="30" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                          {/* Simple Paw SVG Path */}
-                          <circle cx="10" cy="10" r="3" fill="rgba(0,0,0,0.5)"/>
-                          <circle cx="6" cy="6" r="1.5" fill="rgba(0,0,0,0.5)"/>
-                          <circle cx="14" cy="6" r="1.5" fill="rgba(0,0,0,0.5)"/>
-                          <circle cx="10" cy="4" r="1.5" fill="rgba(0,0,0,0.5)"/>
-                        </pattern>
-                      </defs>
-                      <rect width="100%" height="100%" fill="url(#paws)" />
-                    </svg>
+                <div className="pt-4 border-t border-slate-100">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Detalhes</h4>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Textura (Parte 3)</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="textureType"
+                          checked={currentProduct.textureType === 'cadastrada'}
+                          onChange={() => handleProductChange('textureType', 'cadastrada')}
+                          className="text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>Padrão</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="textureType"
+                          checked={currentProduct.textureType === 'personalizada'}
+                          onChange={() => {
+                            handleProductChange('textureType', 'personalizada');
+                            handleProductChange('textureValue', '');
+                          }}
+                          className="text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>Personalizada</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    {currentProduct.textureType === 'cadastrada' ? (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Selecione a Textura</label>
+                        <select 
+                          className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                          value={currentProduct.textureValue}
+                          onChange={(e) => handleProductChange('textureValue', e.target.value)}
+                        >
+                          {availableTextures.length === 0 && <option value="">Nenhuma textura cadastrada</option>}
+                          {availableTextures.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Descreva a Textura</label>
+                        <input 
+                          type="text"
+                          className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                          placeholder="Ex: Escamas de dragão, Floral..."
+                          value={currentProduct.textureValue}
+                          onChange={(e) => handleProductChange('textureValue', e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="flex items-center gap-4 mb-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-0">Gravar nome do cachorrinho?</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newState = !showDogNameInput;
+                          setShowDogNameInput(newState);
+                          if (!newState) {
+                            handleProductChange('dogName', '');
+                          }
+                        }}
+                        className={`px-4 py-1 rounded-full text-xs font-bold transition-all border ${
+                          showDogNameInput 
+                            ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-200' 
+                            : 'bg-white text-slate-400 border-slate-300 hover:border-indigo-300'
+                        }`}
+                      >
+                        SIM
+                      </button>
+                    </div>
+                    
+                    {showDogNameInput && (
+                      <input 
+                        type="text"
+                        className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white animate-fade-in"
+                        placeholder="Nome para gravar na peça"
+                        value={currentProduct.dogName}
+                        onChange={(e) => handleProductChange('dogName', e.target.value)}
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Observações do Item</label>
+                    <textarea 
+                      rows={2}
+                      className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none bg-white"
+                      placeholder="Ex: Detalhes específicos..."
+                      value={currentProduct.observations}
+                      onChange={(e) => handleProductChange('observations', e.target.value)}
+                    />
                   </div>
                   
-                  {/* Label for Top Part */}
-                  <span className="relative z-40 text-black font-bold text-sm tracking-wider uppercase drop-shadow-sm">TAMPA</span>
+                  <div className="mt-6">
+                      <Button 
+                        type="button" 
+                        onClick={handleAddToCart}
+                        className="w-full justify-center shadow-md hover:shadow-lg transform transition-all active:scale-95"
+                      >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Adicionar Item ao Pedido
+                      </Button>
+                  </div>
+                </div>
+              </div>
 
-                  {/* Texture Tooltip */}
-                  <div className="absolute -right-36 top-0 bg-slate-800 text-white text-xs p-2 rounded opacity-0 hover:opacity-100 transition-opacity w-32 pointer-events-none z-50">
-                    Textura: {product.textureValue || "Nenhuma"}
+              {/* Visualizer */}
+              <div className="bg-slate-100 rounded-xl p-8 flex flex-col items-center justify-start border border-slate-200 sticky top-4 h-fit">
+                <h4 className="text-slate-500 font-medium mb-12 uppercase tracking-wider text-sm">Visualização do Item Atual</h4>
+                <div className="relative flex flex-col items-center">
+                  
+                  {/* Part 3 (Top) */}
+                  <div 
+                    className="w-40 h-24 relative z-30 mb-[-16px] transition-colors duration-300 flex items-center justify-center shadow-lg"
+                    style={{ 
+                      backgroundColor: currentProduct.part3Color,
+                      clipPath: 'polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)',
+                      borderRadius: '0 0 10px 10px'
+                    }}
+                  >
+                    <div className="absolute inset-0 opacity-30 pointer-events-none overflow-hidden">
+                      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                          <pattern id="paws" width="30" height="30" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                            <circle cx="10" cy="10" r="3" fill="rgba(0,0,0,0.5)"/>
+                            <circle cx="6" cy="6" r="1.5" fill="rgba(0,0,0,0.5)"/>
+                            <circle cx="14" cy="6" r="1.5" fill="rgba(0,0,0,0.5)"/>
+                            <circle cx="10" cy="4" r="1.5" fill="rgba(0,0,0,0.5)"/>
+                          </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#paws)" />
+                      </svg>
+                    </div>
+                    
+                    <span className="relative z-40 text-black font-bold text-sm tracking-wider uppercase drop-shadow-sm">TAMPA</span>
+
+                    <div className="absolute -right-36 top-0 bg-slate-800 text-white text-xs p-2 rounded opacity-0 hover:opacity-100 transition-opacity w-32 pointer-events-none z-50">
+                      Textura: {currentProduct.textureValue || "Nenhuma"}
+                    </div>
+                  </div>
+                  
+                  {/* Part 2 (Middle) */}
+                  <div 
+                    className="w-24 h-24 rounded-full shadow-inner relative z-20 mb-[-20px] transition-colors duration-300 flex items-center justify-center border border-black/5"
+                    style={{ backgroundColor: currentProduct.part2Color }}
+                  >
+                    <div className="absolute inset-0 rounded-full opacity-20 pointer-events-none" style={{
+                      backgroundImage: 'radial-gradient(circle at center, rgba(0,0,0,0.6) 1px, transparent 1.5px)',
+                      backgroundSize: '8px 8px',
+                      backgroundPosition: '0 0'
+                    }}></div>
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-black/20 to-white/30 pointer-events-none"></div>
+                    <span className="text-white/80 text-[10px] font-bold uppercase mix-blend-overlay relative z-10">Bola</span>
+                  </div>
+
+                  {/* Part 1 (Base) */}
+                  <div 
+                    className="w-48 h-14 rounded-[50%] z-10 flex items-center justify-center transition-colors duration-300 relative shadow-xl border-b-4 border-black/10"
+                    style={{ backgroundColor: currentProduct.part1Color }}
+                  >
+                    <div className="absolute inset-2 rounded-[50%] border-2 border-white/20"></div>
+                    <span className="text-black font-bold text-sm uppercase relative z-20">BASE</span>
                   </div>
                 </div>
                 
-                {/* Part 2 (Middle) - Golf Ball Style */}
-                <div 
-                  className="w-24 h-24 rounded-full shadow-inner relative z-20 mb-[-20px] transition-colors duration-300 flex items-center justify-center border border-black/5"
-                  style={{ backgroundColor: product.part2Color }}
-                >
-                  {/* Golf Ball Dimple Effect Overlay */}
-                  <div className="absolute inset-0 rounded-full opacity-20 pointer-events-none" style={{
-                    backgroundImage: 'radial-gradient(circle at center, rgba(0,0,0,0.6) 1px, transparent 1.5px)',
-                    backgroundSize: '8px 8px',
-                    backgroundPosition: '0 0'
-                  }}></div>
-                  
-                  {/* Light reflection/shine for 3D effect */}
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-black/20 to-white/30 pointer-events-none"></div>
-                  
-                  <span className="text-white/80 text-[10px] font-bold uppercase mix-blend-overlay relative z-10">Bola</span>
-                </div>
-
-                {/* Part 1 (Base) - Ring/Saucer Style */}
-                <div 
-                  className="w-48 h-14 rounded-[50%] z-10 flex items-center justify-center transition-colors duration-300 relative shadow-xl border-b-4 border-black/10"
-                  style={{ backgroundColor: product.part1Color }}
-                >
-                  {/* Inner ring simulation */}
-                  <div className="absolute inset-2 rounded-[50%] border-2 border-white/20"></div>
-                  <span className="text-black font-bold text-sm uppercase relative z-20">BASE</span>
-                </div>
-              </div>
-              
-              <div className="mt-12 flex flex-col gap-1 items-center">
-                 <p className="text-xs text-slate-400 text-center max-w-xs">
-                  * Representação esquemática baseada no modelo 3D.
-                </p>
-                <div className="flex gap-4 text-[10px] text-slate-400">
-                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400"></div>Topo (Patinhas)</span>
-                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400"></div>Bola (Golf)</span>
-                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400"></div>Base (Anel)</span>
+                <div className="mt-12 flex flex-col gap-1 items-center">
+                   <p className="text-xs text-slate-400 text-center max-w-xs">
+                    * Representação esquemática.
+                  </p>
                 </div>
               </div>
             </div>
@@ -327,27 +437,24 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2 flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
                <DollarSign className="w-5 h-5 text-green-600" />
-               <h3 className="text-lg font-medium text-slate-900">Financeiro</h3>
+               <h3 className="text-lg font-medium text-slate-900">Financeiro ({cartItems.length} itens no pedido)</h3>
             </div>
 
             <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Valor do Pedido (R$)</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">R$</span>
-                <input 
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full rounded-lg border-slate-300 border pl-10 p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                  placeholder="0,00"
-                />
-              </div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total do Pedido (R$)</label>
+              <input 
+                type="text"
+                inputMode="numeric"
+                value={priceDisplay}
+                onChange={handlePriceChange}
+                className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium text-lg"
+                placeholder="R$ 0,00"
+              />
+              <p className="text-xs text-slate-400 mt-1">Digite apenas os números, a formatação é automática.</p>
             </div>
 
-            <div className="md:col-span-1 flex items-end pb-2">
-              <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg w-full bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+            <div className="md:col-span-1 flex items-end pb-4">
+              <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg w-full bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors h-[46px]">
                 <input 
                   type="checkbox"
                   checked={isPaid}
@@ -408,8 +515,9 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 required
                 placeholder="(00) 00000-0000"
                 value={customer.phone}
-                onChange={handleCustomerChange}
+                onChange={handlePhoneChange}
                 className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                maxLength={15}
               />
             </div>
 
@@ -430,17 +538,98 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               </div>
             </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Endereço Completo *</label>
+            {/* Separated Address Fields */}
+            <div className="md:col-span-2 mt-4 flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
+               <Box className="w-5 h-5 text-indigo-600" />
+               <h3 className="text-lg font-medium text-slate-900">Endereço de Entrega</h3>
+            </div>
+
+            <div className="md:col-span-1">
+              <label className="block text-sm font-medium text-slate-700 mb-1">CEP</label>
               <input 
                 type="text"
-                name="address"
-                required
-                placeholder="Rua, Número, Bairro, Cidade - UF, CEP"
-                value={customer.address}
+                name="zipCode"
+                placeholder="00000-000"
+                value={customer.zipCode}
                 onChange={handleCustomerChange}
                 className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
               />
+            </div>
+
+             <div className="md:col-span-1">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Rua / Logradouro *</label>
+              <input 
+                type="text"
+                name="street"
+                required
+                value={customer.street}
+                onChange={handleCustomerChange}
+                className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 md:col-span-1">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Número *</label>
+                <input 
+                  type="text"
+                  name="number"
+                  required
+                  value={customer.number}
+                  onChange={handleCustomerChange}
+                  className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Complemento</label>
+                <input 
+                  type="text"
+                  name="complement"
+                  placeholder="Ap, Bloco..."
+                  value={customer.complement}
+                  onChange={handleCustomerChange}
+                  className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                />
+              </div>
+            </div>
+
+             <div className="md:col-span-1">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Bairro *</label>
+              <input 
+                type="text"
+                name="neighborhood"
+                required
+                value={customer.neighborhood}
+                onChange={handleCustomerChange}
+                className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 md:col-span-2">
+               <div className="col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Cidade *</label>
+                <input 
+                  type="text"
+                  name="city"
+                  required
+                  value={customer.city}
+                  onChange={handleCustomerChange}
+                  className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                />
+              </div>
+               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">UF *</label>
+                <input 
+                  type="text"
+                  name="state"
+                  required
+                  maxLength={2}
+                  placeholder="SP"
+                  value={customer.state}
+                  onChange={(e) => setCustomer(prev => ({...prev, state: e.target.value.toUpperCase()}))}
+                  className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white uppercase"
+                />
+              </div>
             </div>
           </div>
         )}
@@ -456,13 +645,18 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         </Button>
         
         {step === 1 ? (
-          <Button type="button" onClick={() => setStep(2)}>
-            Próximo: Dados do Cliente
+          <Button 
+            type="button" 
+            onClick={() => setStep(2)}
+            disabled={cartItems.length === 0}
+            className={cartItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
+          >
+            {cartItems.length === 0 ? 'Adicione um item para continuar' : `Próximo: Dados do Cliente (${cartItems.length} itens)`}
           </Button>
         ) : (
           <Button type="submit">
             <Save className="w-4 h-4 mr-2" />
-            Salvar Pedido
+            Salvar Pedido ({cartItems.length} itens)
           </Button>
         )}
       </div>

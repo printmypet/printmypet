@@ -34,14 +34,23 @@ export type OrderStatus = 'Pendente' | 'Em Impress√£o' | 'Acabamento' | 'Conclu√
 
 export interface Customer {
   name: string;
-  address: string;
   email: string;
   phone: string;
   cpf: string;
   instagram?: string;
+  // Address fields
+  address: string; // Full formatted address for display
+  zipCode?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
 }
 
 export interface ProductConfig {
+  id: string; // Temporary ID for list management in form
   part1Color: string; // Base
   part2Color: string; // Bola
   part3Color: string; // Detalhe/Topo
@@ -55,7 +64,7 @@ export interface Order {
   id: string;
   createdAt: string;
   customer: Customer;
-  product: ProductConfig;
+  products: ProductConfig[]; // Changed from single product to array
   status: OrderStatus;
   price: number;
   isPaid: boolean;
