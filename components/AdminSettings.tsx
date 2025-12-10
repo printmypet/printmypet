@@ -1,20 +1,24 @@
+
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy } from 'lucide-react';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { PartsColors, SupabaseConfig } from '../types';
 import { Button } from './ui/Button';
+import { testConnection } from '../services/supabase';
 
 interface AdminSettingsProps {
   partsColors: PartsColors;
   textures: string[];
   onUpdatePartsColors: (colors: PartsColors) => void;
   onUpdateTextures: (textures: string[]) => void;
+  onConfigUpdate: () => void;
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ 
   partsColors, 
   textures, 
   onUpdatePartsColors, 
-  onUpdateTextures 
+  onUpdateTextures,
+  onConfigUpdate
 }) => {
   // Automatically select 'cloud' tab if not configured
   const [activeTab, setActiveTab] = useState<'products' | 'cloud'>(() => {
@@ -33,6 +37,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     supabaseKey: ''
   });
   const [isCloudConfigured, setIsCloudConfigured] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{success: boolean; message?: string} | null>(null);
 
   useEffect(() => {
     const savedConfig = localStorage.getItem('app-supabase-config');
@@ -42,12 +48,38 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     }
   }, []);
 
-  const handleSaveCloudConfig = (e: React.FormEvent) => {
+  const handleSaveCloudConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('app-supabase-config', JSON.stringify(supabaseConfig));
-    setIsCloudConfigured(true);
-    alert('Configuração salva! Recarregue a página para conectar.');
-    window.location.reload();
+    setIsTesting(true);
+    setTestResult(null);
+
+    // 1. Basic Validation
+    if (!supabaseConfig.supabaseUrl || !supabaseConfig.supabaseKey) {
+       setIsTesting(false);
+       setTestResult({ success: false, message: 'Preencha ambos os campos.' });
+       return;
+    }
+
+    // 2. Test Connection
+    const result = await testConnection(supabaseConfig);
+    
+    setIsTesting(false);
+    setTestResult(result);
+
+    if (result.success) {
+      // 3. Save if success
+      // Remove trailing spaces just in case
+      const cleanConfig = {
+        supabaseUrl: supabaseConfig.supabaseUrl.trim(),
+        supabaseKey: supabaseConfig.supabaseKey.trim()
+      };
+      
+      localStorage.setItem('app-supabase-config', JSON.stringify(cleanConfig));
+      setIsCloudConfigured(true);
+      
+      // Update App state without reloading page to avoid 404 errors in preview environments
+      onConfigUpdate();
+    }
   };
 
   const handleClearCloudConfig = () => {
@@ -58,7 +90,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         supabaseUrl: '',
         supabaseKey: ''
       });
-      window.location.reload();
+      onConfigUpdate(); // Update App state
     }
   };
 
@@ -197,6 +229,7 @@ alter publication supabase_realtime add table public.orders;
                             placeholder="https://xyz.supabase.co"
                             required
                         />
+                         <p className="text-xs text-slate-400 mt-1">Copie do Supabase: Project Settings {'>'} API {'>'} URL</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">API Key (public/anon)</label>
@@ -208,7 +241,18 @@ alter publication supabase_realtime add table public.orders;
                             placeholder="eyJxh..."
                             required
                         />
+                         <p className="text-xs text-slate-400 mt-1">Copie do Supabase: Project Settings {'>'} API {'>'} anon/public key</p>
                     </div>
+
+                    {testResult && (
+                      <div className={`p-3 rounded-lg text-sm border ${testResult.success ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'} flex items-start gap-2`}>
+                        {testResult.success ? <CheckCircle className="w-5 h-5 flex-shrink-0" /> : <AlertTriangle className="w-5 h-5 flex-shrink-0" />}
+                        <div>
+                          <strong>{testResult.success ? 'Conexão bem sucedida!' : 'Falha na conexão:'}</strong>
+                          <p>{testResult.message || (testResult.success ? 'Conectado! Verifique o topo da página.' : '')}</p>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="pt-4 border-t border-emerald-100/50 flex justify-end gap-3">
                          {isCloudConfigured && (
@@ -216,9 +260,18 @@ alter publication supabase_realtime add table public.orders;
                                 Desconectar
                             </Button>
                          )}
-                         <Button type="submit">
-                            <Save className="w-4 h-4 mr-2" />
-                            Salvar Configuração
+                         <Button type="submit" disabled={isTesting}>
+                            {isTesting ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Testando...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                {isCloudConfigured ? 'Atualizar Configuração' : 'Salvar e Conectar'}
+                              </>
+                            )}
                          </Button>
                     </div>
                 </form>
@@ -248,7 +301,10 @@ alter publication supabase_realtime add table public.orders;
 );
 
 -- Habilitar Realtime
-alter publication supabase_realtime add table public.orders;`}
+alter publication supabase_realtime add table public.orders;
+
+-- Habilitar Acesso Público (para app simples)
+ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;`}
                     </pre>
                     <button 
                         onClick={copySql}
@@ -260,7 +316,7 @@ alter publication supabase_realtime add table public.orders;`}
                 </div>
                 
                 <div className="mt-4 text-xs text-slate-500">
-                   * Não esqueça de desabilitar RLS ou configurar as policies para acesso público se for um app interno simples.
+                   * Não esqueça de desabilitar RLS (última linha do SQL) para este app funcionar sem login de usuário final.
                 </div>
             </div>
         </div>

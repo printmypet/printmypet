@@ -23,6 +23,7 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showSetupBanner, setShowSetupBanner] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0); // Key to trigger re-init
 
   // Config State
   const [partsColors, setPartsColors] = useState<PartsColors>(() => {
@@ -46,21 +47,28 @@ const App: React.FC = () => {
   useEffect(() => {
     const supabaseConfigStr = localStorage.getItem('app-supabase-config');
     let connected = false;
+    let unsubscribe = () => {};
 
     if (supabaseConfigStr) {
-      const config: SupabaseConfig = JSON.parse(supabaseConfigStr);
-      connected = initSupabase(config);
-      setIsOnline(connected);
+      try {
+        const config: SupabaseConfig = JSON.parse(supabaseConfigStr);
+        connected = initSupabase(config);
+        setIsOnline(connected);
+      } catch (e) {
+        console.error("Invalid config", e);
+        setIsOnline(false);
+      }
     } else {
       setShowSetupBanner(true);
+      setIsOnline(false);
     }
 
     if (connected) {
+      setShowSetupBanner(false);
       // Subscribe to Supabase Realtime
-      const unsubscribe = subscribeToOrders((cloudOrders) => {
+      unsubscribe = subscribeToOrders((cloudOrders) => {
         setOrders(cloudOrders);
       });
-      return () => unsubscribe();
     } else {
       // Fallback to Local Storage
       const savedOrders = localStorage.getItem('3d-print-orders');
@@ -86,7 +94,11 @@ const App: React.FC = () => {
         }
       }
     }
-  }, []);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [reloadKey]); // Depend on reloadKey to re-run
 
   // Save Orders to LocalStorage (Only if Offline)
   useEffect(() => {
@@ -103,6 +115,11 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('app-textures', JSON.stringify(availableTextures));
   }, [availableTextures]);
+
+  const handleConfigUpdate = () => {
+    // Increment key to trigger useEffect re-run
+    setReloadKey(prev => prev + 1);
+  };
 
   const handleSaveOrder = async (newOrderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
     const newOrder: Order = {
@@ -271,6 +288,7 @@ const App: React.FC = () => {
               textures={availableTextures}
               onUpdatePartsColors={setPartsColors}
               onUpdateTextures={setAvailableTextures}
+              onConfigUpdate={handleConfigUpdate}
             />
           ) : (
             <AdminLogin onLogin={() => setIsAdminAuthenticated(true)} />

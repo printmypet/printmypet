@@ -1,3 +1,4 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig, Order } from '../types';
 
@@ -8,12 +9,52 @@ export const initSupabase = (config: SupabaseConfig) => {
   try {
     if (!config.supabaseUrl || !config.supabaseKey) return false;
     
-    supabase = createClient(config.supabaseUrl, config.supabaseKey);
+    // Basic formatting cleanup
+    const url = config.supabaseUrl.trim();
+    const key = config.supabaseKey.trim();
+
+    supabase = createClient(url, key);
     console.log("Supabase initialized successfully");
     return true;
   } catch (error) {
     console.error("Error initializing Supabase:", error);
     return false;
+  }
+};
+
+// New function to test connection explicitly
+export const testConnection = async (config: SupabaseConfig): Promise<{ success: boolean; message?: string }> => {
+  try {
+    const url = config.supabaseUrl.trim();
+    const key = config.supabaseKey.trim();
+
+    if (!url.startsWith('https://')) {
+      return { success: false, message: 'A URL deve começar com https://' };
+    }
+
+    const tempClient = createClient(url, key);
+    
+    // Try to fetch just one ID to verify connection and permissions
+    // We limit to 0 just to check the API response/headers without needing real data
+    const { error } = await tempClient.from('orders').select('id').limit(1);
+
+    if (error) {
+      // Analyze specific Supabase errors
+      if (error.code === 'PGRST204' || error.message?.includes('does not exist')) {
+        return { success: false, message: 'Conexão OK, mas a tabela "orders" não existe. Rode o script SQL no Supabase.' };
+      }
+      if (error.message?.includes('JWT')) {
+        return { success: false, message: 'Chave de API (Anon Key) inválida ou expirada.' };
+      }
+      if (error.message?.includes('FetchError') || error.message?.includes('Network request failed')) {
+         return { success: false, message: 'Erro de rede. Verifique a URL do projeto.' };
+      }
+      return { success: false, message: `Erro do Supabase: ${error.message}` };
+    }
+
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: `Erro de configuração: ${e.message}` };
   }
 };
 
@@ -36,9 +77,6 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
     }
     
     if (data) {
-       // Map Supabase JSON naming convention if needed, but assuming direct mapping
-       // Need to ensure customer and products are parsed if they come as strings, 
-       // but Supabase handles JSON columns automatically as objects in JS.
        onUpdate(data as Order[]);
     }
   };
@@ -52,8 +90,6 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'orders' },
       (payload) => {
-        // Simple strategy: Re-fetch all on any change to ensure sort order and consistency
-        // Optimization: Could manipulate local array based on payload.eventType (INSERT, UPDATE, DELETE)
         fetchOrders();
       }
     )
@@ -68,8 +104,6 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
 export const addOrderToSupabase = async (order: Order) => {
   if (!supabase) return;
 
-  // Supabase expects columns matching the object keys.
-  // Ensure 'customer' and 'products' columns in Supabase are type JSONB.
   const { error } = await supabase
     .from('orders')
     .insert([order]);
