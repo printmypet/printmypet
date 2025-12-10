@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter } from 'lucide-react';
+import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter } from 'lucide-react';
 import { Order, OrderStatus } from '../types';
 import { Button } from './ui/Button';
 
@@ -23,6 +23,7 @@ type FilterType = 'open' | 'completed' | 'all';
 export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, onUpdatePaid, onDelete }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('open');
+  const [showOnlyPaid, setShowOnlyPaid] = useState(false);
 
   const filteredOrders = orders.filter(order => {
     // 1. Text Search Filter
@@ -41,7 +42,10 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
     }
     // if 'all', matchesStatus remains true
 
-    return matchesSearch && matchesStatus;
+    // 3. Payment Filter
+    const matchesPayment = showOnlyPaid ? order.isPaid : true;
+
+    return matchesSearch && matchesStatus && matchesPayment;
   });
 
   const formatCurrency = (value: number) => {
@@ -56,40 +60,58 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
             Gerenciamento de Pedidos
           </h2>
           
-          <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200 self-start md:self-auto">
+          <div className="flex flex-wrap gap-3 items-center self-start md:self-auto">
+             {/* Payment Filter Toggle */}
             <button
-              onClick={() => setFilterType('open')}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                filterType === 'open' 
-                  ? 'bg-white text-indigo-600 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700'
+              onClick={() => setShowOnlyPaid(!showOnlyPaid)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all border ${
+                showOnlyPaid 
+                  ? 'bg-green-100 text-green-700 border-green-200 ring-2 ring-green-100' 
+                  : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
               }`}
+              title="Filtrar apenas pedidos pagos"
             >
-              <Clock className="w-4 h-4" />
-              Em Aberto
+              <DollarSign className="w-4 h-4" />
+              {showOnlyPaid ? 'Somente Pagos' : 'Filtrar Pagos'}
             </button>
-            <button
-              onClick={() => setFilterType('completed')}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                filterType === 'completed' 
-                  ? 'bg-white text-green-600 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <CheckCircle className="w-4 h-4" />
-              Concluídos
-            </button>
-            <button
-              onClick={() => setFilterType('all')}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                filterType === 'all' 
-                  ? 'bg-white text-slate-800 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <ListFilter className="w-4 h-4" />
-              Todos
-            </button>
+
+            <div className="h-6 w-px bg-slate-300 hidden md:block"></div>
+
+            <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200">
+              <button
+                onClick={() => setFilterType('open')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  filterType === 'open' 
+                    ? 'bg-white text-indigo-600 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                Em Aberto
+              </button>
+              <button
+                onClick={() => setFilterType('completed')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  filterType === 'completed' 
+                    ? 'bg-white text-green-600 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Concluídos
+              </button>
+              <button
+                onClick={() => setFilterType('all')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  filterType === 'all' 
+                    ? 'bg-white text-slate-800 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <ListFilter className="w-4 h-4" />
+                Todos
+              </button>
+            </div>
           </div>
         </div>
 
@@ -114,15 +136,22 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
           <p className="text-slate-500 max-w-sm mx-auto mt-1">
             {searchTerm 
               ? `Não encontramos resultados para "${searchTerm}" no filtro selecionado.` 
-              : filterType === 'open' 
-                ? "Não há pedidos pendentes no momento. Bom trabalho!" 
-                : "Ainda não há pedidos nesta categoria."}
+              : showOnlyPaid 
+                ? "Não há pedidos pagos nesta categoria."
+                : filterType === 'open' 
+                  ? "Não há pedidos pendentes no momento." 
+                  : "Ainda não há pedidos nesta categoria."}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6">
-          <div className="text-sm text-slate-500 font-medium">
-            Mostrando {filteredOrders.length} pedido(s) {filterType === 'open' ? 'em aberto' : filterType === 'completed' ? 'concluídos' : ''}
+          <div className="text-sm text-slate-500 font-medium flex gap-2 items-center">
+            <span>Mostrando {filteredOrders.length} pedido(s) {filterType === 'open' ? 'em aberto' : filterType === 'completed' ? 'concluídos' : ''}</span>
+            {showOnlyPaid && (
+               <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold border border-green-200 flex items-center gap-1">
+                 <DollarSign className="w-3 h-3" /> Apenas Pagos
+               </span>
+            )}
           </div>
           {filteredOrders.map(order => (
             <div key={order.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">

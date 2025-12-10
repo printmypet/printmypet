@@ -118,6 +118,20 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     setCustomer(prev => ({ ...prev, phone: value }));
   };
 
+  // CPF Mask
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+    
+    if (value.length > 11) value = value.slice(0, 11);
+
+    // Apply mask 000.000.000-00
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+
+    setCustomer(prev => ({ ...prev, cpf: value }));
+  };
+
   // Currency Mask
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, ''); // Get only numbers
@@ -613,7 +627,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 required
                 placeholder="000.000.000-00"
                 value={customer.cpf}
-                onChange={handleCustomerChange}
+                onChange={handleCpfChange}
+                maxLength={14}
                 className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
               />
             </div>
