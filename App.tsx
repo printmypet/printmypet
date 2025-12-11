@@ -25,7 +25,7 @@ import {
 // Preencha estes campos para que o app funcione em aba anônima ou outros dispositivos
 // sem precisar configurar manualmente pelo painel Admin.
 const FIXED_CONFIG = {
-  url: "https://ptymvjqnsxdllljqaeqz.supabase.co", // Coloque sua URL do Supabase aqui (ex: https://xyz.supabase.co)
+  url: "https://ptymvjqnsxdllljqaeqz.supabase.co", // Coloque sua URL do Supabase aqui
   key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0eW12anFuc3hkbGxsanFhZXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzOTk5NjgsImV4cCI6MjA4MDk3NTk2OH0.N6To6n4hKRBFAtQKq1XUahR-LEDyfenekBiI_GoLkDk"  // Coloque sua KEY (anon/public) aqui
 };
 
@@ -89,27 +89,36 @@ const App: React.FC = () => {
     let connected = false;
     let unsubscribe = () => {};
 
-    // Prioridade:
-    // 1. Configuração Local salva (se existir e não estivermos forçando prod hardcoded)
-    // 2. Variáveis de Ambiente ou Fixed Config (se for prod)
+    // Prioridade de Carregamento:
+    // 1. Configuração Local salva (apenas se for válida)
+    // 2. Variáveis de Ambiente ou Fixed Config (fallback)
     
     if (localConfigStr) {
       try {
-        configToUse = JSON.parse(localConfigStr);
+        const parsed = JSON.parse(localConfigStr);
+        // Validar se não está vazio/corrompido
+        if (parsed && parsed.supabaseUrl && parsed.supabaseKey) {
+            configToUse = parsed;
+        }
       } catch (e) {
-        console.error("Invalid local config", e);
+        console.error("Configuração local inválida, ignorando...", e);
       }
     } 
     
-    // Se não achou local (ex: aba anônima), ou se queremos garantir o fallback para prod
-    if (!configToUse && envMode === 'prod' && envConfig.supabaseUrl && envConfig.supabaseKey) {
-      configToUse = envConfig;
+    // Se não temos config local válida, tentamos usar a fixa/env
+    if (!configToUse && envMode === 'prod') {
+       if (envConfig.supabaseUrl && envConfig.supabaseKey) {
+          console.log("Usando configuração fixa/env para conexão.");
+          configToUse = envConfig;
+       }
     }
 
     if (configToUse) {
       connected = initSupabase(configToUse);
       setIsOnline(connected);
+      if (!connected) console.warn("Supabase init falhou com a configuração fornecida.");
     } else {
+      console.warn("Nenhuma configuração de Supabase encontrada (Local ou Fixa).");
       setIsOnline(false);
     }
 
