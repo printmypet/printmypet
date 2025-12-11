@@ -236,8 +236,10 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
   if (!supabase) return () => {};
 
   const fetchOrders = async () => {
+    if (!supabase) return;
+
     // Join with customers table
-    const { data, error } = await supabase!
+    const { data, error } = await supabase
       .from('orders')
       .select('*, customers(*)')
       .order('createdAt', { ascending: false });

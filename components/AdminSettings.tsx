@@ -182,122 +182,108 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   };
 
   const copySql = () => {
-    const sql = `
--- 1. Garante Tabela de Clientes Básica
-CREATE TABLE IF NOT EXISTS public.customers (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at timestamptz DEFAULT now(),
-  name text NOT NULL
-);
-
--- 2. MIGRATION: Adiciona colunas que podem estar faltando
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS email text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS phone text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS type text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS partner_name text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS instagram text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS address_full text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS zip_code text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS street text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS number text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS complement text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS neighborhood text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS city text;
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS state text;
-
--- 3. AJUSTA COLUNAS PARA NÃO SEREM OBRIGATÓRIAS
-ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN partner_name DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN instagram DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN address_full DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN zip_code DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN street DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN number DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN complement DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN neighborhood DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN city DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN state DROP NOT NULL;
-
--- 4. Configura CPF Único (somente se preenchido)
-ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;
-CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL;
-
--- 5. Cria Tabelas Auxiliares
-CREATE TABLE IF NOT EXISTS public.colors (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at timestamptz DEFAULT now(),
-  name text NOT NULL,
-  hex text NOT NULL,
-  part_type text NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS public.textures (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at timestamptz DEFAULT now(),
-  name text NOT NULL UNIQUE
-);
-
--- 6. Tabela de Pedidos e Ajustes de Colunas
-CREATE TABLE IF NOT EXISTS public.orders (
-  id uuid PRIMARY KEY,
-  created_at timestamptz DEFAULT now(),
-  status text,
-  price numeric,
-  shipping_cost numeric,
-  is_paid boolean,
-  products jsonb,
-  customer jsonb
-);
-
--- Garante colunas de suporte
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric;
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean;
-
--- 7. MIGRATION IMPORTANTE: Adiciona a coluna customer_id
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);
-
--- 8. Configurações de Segurança
-ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
-
--- 9. Renomeia colunas se foram criadas erradas (CamelCase -> snake_case)
-DO $$
-BEGIN
-  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shippingCost') THEN
-    ALTER TABLE public.orders RENAME COLUMN "shippingCost" TO shipping_cost;
-  END IF;
-  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='isPaid') THEN
-    ALTER TABLE public.orders RENAME COLUMN "isPaid" TO is_paid;
-  END IF;
-END
-$$;
-
--- 10. Configura Realtime de forma segura
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 
-    FROM pg_publication_tables 
-    WHERE pubname = 'supabase_realtime' 
-    AND schemaname = 'public' 
-    AND tablename = 'orders'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
-  END IF;
-END
-$$;
-
--- 11. Insere Texturas Padrão
-INSERT INTO public.textures (name) VALUES 
-('Liso'), ('Hexagonal'), ('Listrado'), ('Pontilhado'), ('Voronoi')
-ON CONFLICT (name) DO NOTHING;
-    `;
-    navigator.clipboard.writeText(sql.trim());
+    const sqlParts = [
+      "-- SCRIPT DE CONFIGURAÇÃO - PRINTMY[PET]3D (v4)",
+      "",
+      "-- 1. Tabela de Clientes",
+      "CREATE TABLE IF NOT EXISTS public.customers (",
+      "  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,",
+      "  created_at timestamptz DEFAULT now(),",
+      "  name text NOT NULL",
+      ");",
+      "",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS email text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS phone text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS type text DEFAULT 'final';",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS partner_name text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS instagram text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS address_full text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS zip_code text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS street text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS number text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS complement text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS neighborhood text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS city text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS state text;",
+      "",
+      "ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;",
+      "ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;",
+      "ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;",
+      "",
+      "ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;",
+      "DROP INDEX IF EXISTS customers_cpf_unique_idx;",
+      "CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL AND cpf != '';",
+      "",
+      "-- 2. Tabelas Auxiliares",
+      "CREATE TABLE IF NOT EXISTS public.colors (",
+      "  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,",
+      "  created_at timestamptz DEFAULT now(),",
+      "  name text NOT NULL,",
+      "  hex text NOT NULL,",
+      "  part_type text NOT NULL",
+      ");",
+      "",
+      "CREATE TABLE IF NOT EXISTS public.textures (",
+      "  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,",
+      "  created_at timestamptz DEFAULT now(),",
+      "  name text NOT NULL UNIQUE",
+      ");",
+      "",
+      "-- 3. Tabela de Pedidos",
+      "CREATE TABLE IF NOT EXISTS public.orders (",
+      "  id uuid PRIMARY KEY,",
+      "  created_at timestamptz DEFAULT now(),",
+      "  status text,",
+      "  price numeric,",
+      "  products jsonb,",
+      "  customer jsonb",
+      ");",
+      "",
+      "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric DEFAULT 0;",
+      "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean DEFAULT false;",
+      "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);",
+      "",
+      "-- 4. CORREÇÃO DE COLUNAS",
+      "DO $$",
+      "BEGIN",
+      "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shippingCost') THEN",
+      "    ALTER TABLE public.orders RENAME COLUMN \"shippingCost\" TO shipping_cost;",
+      "  END IF;",
+      "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shippingcost') THEN",
+      "    ALTER TABLE public.orders RENAME COLUMN shippingcost TO shipping_cost;",
+      "  END IF;",
+      "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='isPaid') THEN",
+      "    ALTER TABLE public.orders RENAME COLUMN \"isPaid\" TO is_paid;",
+      "  END IF;",
+      "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='ispaid') THEN",
+      "    ALTER TABLE public.orders RENAME COLUMN ispaid TO is_paid;",
+      "  END IF;",
+      "END",
+      "$$;",
+      "",
+      "-- 5. Segurança",
+      "ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;",
+      "ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;",
+      "ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;",
+      "ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;",
+      "",
+      "-- 6. Realtime",
+      "DO $$",
+      "BEGIN",
+      "  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'orders') THEN",
+      "    ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;",
+      "  END IF;",
+      "END",
+      "$$;",
+      "",
+      "-- 7. Dados Iniciais",
+      "INSERT INTO public.textures (name) VALUES",
+      "('Liso'), ('Hexagonal'), ('Listrado'), ('Pontilhado'), ('Voronoi')",
+      "ON CONFLICT (name) DO NOTHING;"
+    ];
+    
+    navigator.clipboard.writeText(sqlParts.join('\n'));
     alert("SQL Completo copiado! Rode no 'SQL Editor' do Supabase.");
   };
 
@@ -433,15 +419,11 @@ ON CONFLICT (name) DO NOTHING;
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- Script de Migração Automático v3
--- 1. Cria ou Atualiza Tabela Customers
+{`-- SCRIPT DE CONFIGURAÇÃO (v4)
+-- (Clique no botão copiar para ver tudo)
 CREATE TABLE IF NOT EXISTS public.customers (...);
-ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;
-...
--- 2. Adiciona customer_id em Orders
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);
-...
--- (Clique no botão copiar para pegar o script completo)`}
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean;`}
                     </pre>
                     <button 
                         onClick={copySql}
