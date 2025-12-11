@@ -183,6 +183,16 @@ export const upsertCustomer = async (customer: Customer): Promise<string> => {
     existing = data;
   }
 
+  // If no existing by CPF but we have an ID (edit mode), verify existence
+  if (!existing && customer.id) {
+     const { data } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('id', customer.id)
+      .single();
+     existing = data;
+  }
+
   const customerPayload = {
     name: customer.name.trim(),
     email: toNull(customer.email),
@@ -304,18 +314,60 @@ export const addOrderToSupabase = async (order: Order) => {
     createdAt: order.createdAt,
     status: order.status,
     price: order.price,
-    shippingCost: order.shippingCost,
-    isPaid: order.isPaid,
+    shipping_cost: order.shippingCost, // DB uses snake_case sometimes depending on migration, keeping consistent with SELECT
+    is_paid: order.isPaid,
     customer_id: customerId, // Foreign Key
     products: order.products // Keep products as JSON for now
+  };
+  
+  // Note: Handle snake_case vs camelCase mapping if needed. 
+  // Based on the SQL provided earlier: price, shipping_cost, is_paid.
+  // We need to match the INSERT statement columns.
+  // Let's refine payload to match SQL columns exactly.
+  const cleanPayload = {
+    id: order.id,
+    created_at: order.createdAt,
+    status: order.status,
+    price: order.price,
+    shipping_cost: order.shippingCost,
+    is_paid: order.isPaid,
+    customer_id: customerId,
+    products: order.products
   };
 
   const { error } = await supabase
     .from('orders')
-    .insert([orderPayload]);
+    .insert([cleanPayload]);
 
   if (error) {
     console.error("Error adding order to Supabase: ", error);
+    throw error;
+  }
+};
+
+export const updateOrderInSupabase = async (order: Order) => {
+  if (!supabase) return;
+
+  // 1. Update Customer
+  const customerId = await upsertCustomer(order.customer);
+
+  // 2. Update Order
+  const cleanPayload = {
+    status: order.status,
+    price: order.price,
+    shipping_cost: order.shippingCost,
+    is_paid: order.isPaid,
+    customer_id: customerId,
+    products: order.products
+  };
+
+  const { error } = await supabase
+    .from('orders')
+    .update(cleanPayload)
+    .eq('id', order.id);
+
+  if (error) {
+    console.error("Error updating order in Supabase: ", error);
     throw error;
   }
 };
@@ -329,7 +381,8 @@ export const updateOrderStatusInSupabase = async (id: string, status: string) =>
 // Update Order Paid Status
 export const updateOrderPaidInSupabase = async (id: string, isPaid: boolean) => {
   if (!supabase) return;
-  await supabase.from('orders').update({ isPaid }).eq('id', id);
+  // DB column is is_paid
+  await supabase.from('orders').update({ is_paid: isPaid }).eq('id', id);
 };
 
 // Delete Order
