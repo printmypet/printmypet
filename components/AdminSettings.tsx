@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User, TrendingUp, DollarSign, Package, Truck, Calendar } from 'lucide-react';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User, TrendingUp, DollarSign, Package, Truck, Calendar, Edit2, X, RefreshCw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { PartsColors, SupabaseConfig, Texture, ColorOption, AppUser, Order } from '../types';
 import { Button } from './ui/Button';
-import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions, registerUser } from '../services/supabase';
+import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions, registerUser, fetchUsers, updateUser, deleteUser } from '../services/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AdminSettingsProps {
@@ -62,7 +62,11 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{success: boolean; message?: string} | null>(null);
 
-  // User Registration State
+  // User Management State
+  const [usersList, setUsersList] = useState<AppUser[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  
   const [newUserName, setNewUserName] = useState('');
   const [newUserLogin, setNewUserLogin] = useState('');
   const [newUserPass, setNewUserPass] = useState('');
@@ -97,6 +101,20 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     const env = localStorage.getItem('app-env-mode') as 'prod' | 'test';
     if (env) setCurrentEnv(env);
   }, []);
+
+  // Fetch Users when tab is active
+  useEffect(() => {
+     if (activeTab === 'users' && isOnline) {
+       loadUsers();
+     }
+  }, [activeTab, isOnline]);
+
+  const loadUsers = async () => {
+     setIsLoadingUsers(true);
+     const users = await fetchUsers();
+     setUsersList(users);
+     setIsLoadingUsers(false);
+  };
 
   // --- Financial Reports Logic ---
   const financialData = useMemo(() => {
@@ -212,7 +230,32 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     }
   };
 
-  const handleRegisterUser = async (e: React.FormEvent) => {
+  const resetUserForm = () => {
+      setNewUserName('');
+      setNewUserLogin('');
+      setNewUserPass('');
+      setNewUserIsAdmin(false);
+      setEditingUserId(null);
+      setUserMsg(null);
+  };
+
+  const handleEditUser = (user: AppUser) => {
+      setEditingUserId(user.id);
+      setNewUserName(user.name);
+      setNewUserLogin(user.username);
+      setNewUserPass(user.password || ''); 
+      setNewUserIsAdmin(user.role === 'admin');
+      setUserMsg(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteUser = async (id: string) => {
+      if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
+      await deleteUser(id);
+      loadUsers();
+  };
+
+  const handleRegisterOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setUserMsg(null);
     setIsRegistering(true);
@@ -223,21 +266,30 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         return;
     }
 
-    const result = await registerUser({
-        name: newUserName,
-        username: newUserLogin,
-        password: newUserPass,
-        role: newUserIsAdmin ? 'admin' : 'user'
-    });
+    let result;
+    if (editingUserId) {
+        result = await updateUser({
+            id: editingUserId,
+            name: newUserName,
+            username: newUserLogin,
+            password: newUserPass,
+            role: newUserIsAdmin ? 'admin' : 'user'
+        });
+    } else {
+        result = await registerUser({
+            name: newUserName,
+            username: newUserLogin,
+            password: newUserPass,
+            role: newUserIsAdmin ? 'admin' : 'user'
+        });
+    }
 
     if (result.success) {
-        setUserMsg({ type: 'success', text: 'Usuário cadastrado com sucesso!' });
-        setNewUserName('');
-        setNewUserLogin('');
-        setNewUserPass('');
-        setNewUserIsAdmin(false);
+        setUserMsg({ type: 'success', text: editingUserId ? 'Usuário atualizado!' : 'Usuário cadastrado!' });
+        resetUserForm();
+        loadUsers();
     } else {
-        setUserMsg({ type: 'error', text: result.message || 'Erro ao cadastrar.' });
+        setUserMsg({ type: 'error', text: result.message || 'Erro ao salvar.' });
     }
     setIsRegistering(false);
   };
@@ -553,18 +605,29 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       {isAdmin && activeTab === 'users' && (
         <div className="max-w-4xl mx-auto space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-6 border-b border-slate-200 flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 rounded-full text-indigo-600">
-                        <Users className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-900">Gerenciar Usuários</h3>
-                        <p className="text-sm text-slate-500">Cadastre novos usuários para acessar o sistema.</p>
-                    </div>
+                <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-100 rounded-full text-indigo-600">
+                          <Users className="w-6 h-6" />
+                      </div>
+                      <div>
+                          <h3 className="text-lg font-bold text-slate-900">
+                              {editingUserId ? 'Editar Usuário' : 'Gerenciar Usuários'}
+                          </h3>
+                          <p className="text-sm text-slate-500">
+                              {editingUserId ? 'Atualize os dados abaixo.' : 'Cadastre novos usuários para acessar o sistema.'}
+                          </p>
+                      </div>
+                   </div>
+                   {editingUserId && (
+                       <Button variant="secondary" size="sm" onClick={resetUserForm}>
+                           <X className="w-4 h-4 mr-2" /> Cancelar Edição
+                       </Button>
+                   )}
                 </div>
 
                 <div className="p-8">
-                    <form onSubmit={handleRegisterUser} className="max-w-md mx-auto space-y-5">
+                    <form onSubmit={handleRegisterOrUpdateUser} className="max-w-md mx-auto space-y-5">
                          {userMsg && (
                             <div className={`p-3 rounded-lg text-sm border flex items-center gap-2 ${userMsg.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                                 {userMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
@@ -579,7 +642,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                               required
                               value={newUserName}
                               onChange={(e) => setNewUserName(e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              className="w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
                               placeholder="Ex: João da Silva"
                             />
                         </div>
@@ -595,25 +658,27 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                                 required
                                 value={newUserLogin}
                                 onChange={(e) => setNewUserLogin(e.target.value)}
-                                className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
                                 placeholder="joao.silva"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                {editingUserId ? 'Nova Senha' : 'Senha'}
+                            </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <Lock className="h-5 w-5 text-slate-400" />
                                 </div>
                                 <input
-                                type="password"
-                                required
+                                type="text"
+                                required={!editingUserId}
                                 value={newUserPass}
                                 onChange={(e) => setNewUserPass(e.target.value)}
-                                className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                placeholder="******"
+                                className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                                placeholder={editingUserId ? "Deixe visível para alterar" : "******"}
                                 />
                             </div>
                         </div>
@@ -638,12 +703,60 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
                         <Button type="submit" className="w-full" disabled={isRegistering}>
                             {isRegistering ? (
-                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</>
+                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {editingUserId ? 'Atualizando...' : 'Salvando...'}</>
                             ) : (
-                                <><UserPlus className="w-4 h-4 mr-2" /> Cadastrar Usuário</>
+                                <>{editingUserId ? <Save className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />} {editingUserId ? 'Atualizar Usuário' : 'Cadastrar Usuário'}</>
                             )}
                         </Button>
                     </form>
+                </div>
+
+                {/* Users List */}
+                <div className="border-t border-slate-200 p-8 bg-slate-50">
+                   <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-bold text-slate-800">Usuários Cadastrados ({usersList.length})</h4>
+                      <Button variant="outline" size="sm" onClick={loadUsers} disabled={isLoadingUsers}>
+                          <RefreshCw className={`w-4 h-4 ${isLoadingUsers ? 'animate-spin' : ''}`} />
+                      </Button>
+                   </div>
+                   
+                   <div className="space-y-3">
+                      {usersList.length === 0 && !isLoadingUsers && (
+                          <p className="text-center text-slate-500 text-sm py-4">Nenhum usuário encontrado.</p>
+                      )}
+                      
+                      {usersList.map(user => (
+                          <div key={user.id} className={`bg-white p-4 rounded-lg border flex items-center justify-between shadow-sm transition-colors ${editingUserId === user.id ? 'border-indigo-500 ring-1 ring-indigo-200' : 'border-slate-200'}`}>
+                              <div className="flex items-center gap-3">
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                                      {user.role === 'admin' ? <ShieldCheck className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                                  </div>
+                                  <div>
+                                      <p className="font-bold text-slate-900">{user.name} {user.id === currentUser?.id && <span className="text-xs text-slate-400 font-normal">(Você)</span>}</p>
+                                      <p className="text-xs text-slate-500 font-mono">@{user.username}</p>
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                  <button 
+                                      onClick={() => handleEditUser(user)}
+                                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                      title="Editar"
+                                  >
+                                      <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  {user.id !== currentUser?.id && (
+                                      <button 
+                                          onClick={() => handleDeleteUser(user.id)}
+                                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                          title="Excluir"
+                                      >
+                                          <Trash2 className="w-4 h-4" />
+                                      </button>
+                                  )}
+                              </div>
+                          </div>
+                      ))}
+                   </div>
                 </div>
             </div>
         </div>

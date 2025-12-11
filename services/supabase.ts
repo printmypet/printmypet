@@ -105,6 +105,60 @@ export const registerUser = async (user: Omit<AppUser, 'id'>): Promise<{ success
   }
 };
 
+export const fetchUsers = async (): Promise<AppUser[]> => {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('*')
+    .order('name', { ascending: true });
+  
+  if (error) {
+    console.error("Error fetching users", error);
+    return [];
+  }
+  return data as AppUser[];
+};
+
+export const updateUser = async (user: AppUser): Promise<{ success: boolean; message?: string }> => {
+  if (!supabase) return { success: false, message: "Offline" };
+  
+  try {
+    // Check if username is taken by someone else
+    const { data: existing } = await supabase
+      .from('app_users')
+      .select('id')
+      .eq('username', user.username)
+      .neq('id', user.id)
+      .single();
+
+    if (existing) {
+        return { success: false, message: "Este login já está em uso por outro usuário." };
+    }
+
+    const { error } = await supabase
+      .from('app_users')
+      .update({
+        name: user.name,
+        username: user.username,
+        password: user.password,
+        role: user.role
+      })
+      .eq('id', user.id);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e.message };
+  }
+};
+
+export const deleteUser = async (id: string): Promise<{ success: boolean; message?: string }> => {
+  if (!supabase) return { success: false, message: "Offline" };
+  const { error } = await supabase.from('app_users').delete().eq('id', id);
+  if (error) return { success: false, message: error.message };
+  return { success: true };
+};
+
 
 // --- Colors Management ---
 
