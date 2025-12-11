@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
   name text NOT NULL,
-  cpf text UNIQUE,
+  cpf text,
   email text,
   phone text,
   type text,
@@ -207,7 +207,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
 -- GARANTE QUE OS CAMPOS NÃO SÃO OBRIGATÓRIOS (Rode isso se der erro de 'not-null constraint')
 ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL; -- Importante!
+ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN partner_name DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN instagram DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN address_full DROP NOT NULL;
@@ -219,13 +219,17 @@ ALTER TABLE public.customers ALTER COLUMN neighborhood DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN city DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN state DROP NOT NULL;
 
+-- Garante Indice Único para CPF apenas se não for nulo
+ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;
+CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL;
+
 -- 2. Tabela de Cores
 CREATE TABLE IF NOT EXISTS public.colors (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
   name text NOT NULL,
   hex text NOT NULL,
-  part_type text NOT NULL -- 'base', 'ball', 'top'
+  part_type text NOT NULL
 );
 
 -- 3. Tabela de Texturas
@@ -402,8 +406,7 @@ ON CONFLICT (name) DO NOTHING;
 CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   name text NOT NULL,
-  cpf text UNIQUE,
-  email text, -- NULLABLE
+  cpf text,
   -- ...campos opcionais
 );
 
@@ -411,6 +414,10 @@ CREATE TABLE IF NOT EXISTS public.customers (
 ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;
+
+-- Garante Indice Único para CPF apenas se não for nulo
+ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;
+CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL;
 -- (Copie o script completo para ver todas as correções)`}
                     </pre>
                     <button 
