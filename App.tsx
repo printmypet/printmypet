@@ -21,12 +21,11 @@ import {
   fetchTexturesFromSupabase
 } from './services/supabase';
 
-// --- CONFIGURAÇÃO FIXA (OPCIONAL) ---
-// Preencha estes campos para que o app funcione em aba anônima ou outros dispositivos
-// sem precisar configurar manualmente pelo painel Admin.
+// --- CONFIGURAÇÃO FIXA (HARDCODED) ---
+// Esta configuração será usada automaticamente se não houver dados no LocalStorage
 const FIXED_CONFIG = {
-  url: "https://ptymvjqnsxdllljqaeqz.supabase.co", // Coloque sua URL do Supabase aqui
-  key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0eW12anFuc3hkbGxsanFhZXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzOTk5NjgsImV4cCI6MjA4MDk3NTk2OH0.N6To6n4hKRBFAtQKq1XUahR-LEDyfenekBiI_GoLkDk"  // Coloque sua KEY (anon/public) aqui
+  url: "https://ptymvjqnsxdllljqaeqz.supabase.co",
+  key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0eW12anFuc3hkbGxsanFhZXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzOTk5NjgsImV4cCI6MjA4MDk3NTk2OH0.N6To6n4hKRBFAtQKq1XUahR-LEDyfenekBiI_GoLkDk"
 };
 
 const App: React.FC = () => {
@@ -76,66 +75,61 @@ const App: React.FC = () => {
     const envMode = localStorage.getItem('app-env-mode') || 'prod';
     setIsTestMode(envMode === 'test');
 
+    let configToUse: SupabaseConfig | null = null;
+    
+    // 2. Tenta carregar do LocalStorage primeiro
     const configKey = envMode === 'test' ? 'app-supabase-config-test' : 'app-supabase-config';
     const localConfigStr = localStorage.getItem(configKey);
-    
-    // Check for Environment Variables (Vercel / .env) OR Fixed Config
-    const envConfig: SupabaseConfig = {
-      supabaseUrl: (import.meta as any).env?.VITE_SUPABASE_URL || FIXED_CONFIG.url || '',
-      supabaseKey: (import.meta as any).env?.VITE_SUPABASE_KEY || FIXED_CONFIG.key || ''
-    };
 
-    let configToUse: SupabaseConfig | null = null;
-    let connected = false;
-    let unsubscribe = () => {};
-
-    // Prioridade de Carregamento:
-    // 1. Configuração Local salva (apenas se for válida)
-    // 2. Variáveis de Ambiente ou Fixed Config (fallback)
-    
     if (localConfigStr) {
       try {
         const parsed = JSON.parse(localConfigStr);
-        // Validar se não está vazio/corrompido
-        if (parsed && parsed.supabaseUrl && parsed.supabaseKey) {
+        // Só aceita se tiver URL e Key preenchidos
+        if (parsed && parsed.supabaseUrl && parsed.supabaseKey && parsed.supabaseUrl.length > 5) {
             configToUse = parsed;
         }
       } catch (e) {
-        console.error("Configuração local inválida, ignorando...", e);
+        console.warn("Configuração local inválida ou corrompida.");
       }
     } 
     
-    // Se não temos config local válida, tentamos usar a fixa/env
+    // 3. Se não achou no local (ou estava inválido), e estamos em PROD, usa a HARDCODED
     if (!configToUse && envMode === 'prod') {
-       if (envConfig.supabaseUrl && envConfig.supabaseKey) {
-          console.log("Usando configuração fixa/env para conexão.");
-          configToUse = envConfig;
+       if (FIXED_CONFIG.url && FIXED_CONFIG.key) {
+          console.log("Usando configuração fixa (Hardcoded) do App.tsx");
+          configToUse = {
+            supabaseUrl: FIXED_CONFIG.url,
+            supabaseKey: FIXED_CONFIG.key
+          };
        }
     }
+
+    // 4. Inicializa
+    let connected = false;
+    let unsubscribe = () => {};
 
     if (configToUse) {
       connected = initSupabase(configToUse);
       setIsOnline(connected);
-      if (!connected) console.warn("Supabase init falhou com a configuração fornecida.");
     } else {
-      console.warn("Nenhuma configuração de Supabase encontrada (Local ou Fixa).");
+      console.warn("Nenhuma configuração válida encontrada (nem Local, nem Fixa).");
       setIsOnline(false);
     }
 
     if (connected) {
-      // 1. Subscribe to Orders
+      // Subscribe to Orders
       unsubscribe = subscribeToOrders((cloudOrders) => {
         setOrders(cloudOrders);
       });
 
-      // 2. Fetch Colors from DB
+      // Fetch Colors from DB
       fetchColorsFromSupabase().then(dbColors => {
         if (dbColors && (dbColors.base.length > 0 || dbColors.ball.length > 0)) {
             setPartsColors(dbColors);
         }
       });
 
-      // 3. Fetch Textures from DB
+      // Fetch Textures from DB
       fetchTexturesFromSupabase().then(dbTextures => {
         if (dbTextures && dbTextures.length > 0) {
           setAvailableTextures(dbTextures);
@@ -143,27 +137,22 @@ const App: React.FC = () => {
       });
 
     } else {
-      // Fallback to Local Storage
+      // Fallback to Local Storage (Offline Mode)
       const savedOrders = localStorage.getItem('3d-print-orders');
       if (savedOrders) {
         try {
           const parsed = JSON.parse(savedOrders);
+          // Migração de dados legados, se necessário
           const migratedOrders = parsed.map((order: any) => {
             if (order.products) return order;
             if (order.product) {
               const legacyProduct = { ...order.product, id: uuidv4() };
-              return {
-                ...order,
-                products: [legacyProduct],
-                product: undefined
-              } as Order;
+              return { ...order, products: [legacyProduct], product: undefined } as Order;
             }
             return order;
           });
           setOrders(migratedOrders);
-        } catch (e) {
-          console.error("Failed to parse orders", e);
-        }
+        } catch (e) {}
       }
     }
 
@@ -204,12 +193,9 @@ const App: React.FC = () => {
 
   const handleSaveOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
     if (editingOrder) {
-      // UPDATE Logic
       const updatedOrder: Order = {
         ...editingOrder,
         ...orderData,
-        // Preserve original sensitive fields unless specifically needed to change
-        // customer.id is handled in upsert logic inside the form/service
       };
 
       if (isOnline) {
@@ -224,7 +210,6 @@ const App: React.FC = () => {
       }
 
     } else {
-      // CREATE Logic
       const newOrder: Order = {
         ...orderData,
         id: uuidv4(),
@@ -282,21 +267,18 @@ const App: React.FC = () => {
     setView('list');
   };
 
-  // If not logged in, show Login Page
   if (!currentUser) {
     return <LoginPage onLogin={setCurrentUser} isOnline={isOnline} />;
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Test Mode Banner */}
       {isTestMode && (
         <div className="bg-orange-600 text-white text-xs font-bold py-1 px-2 text-center flex items-center justify-center gap-2">
            <Beaker className="w-4 h-4" /> AMBIENTE DE TESTES ATIVO - Dados não serão salvos na produção
         </div>
       )}
 
-      {/* Top Bar */}
       <div className="bg-slate-900 text-white text-xs py-1.5 px-4">
          <div className="max-w-7xl mx-auto flex justify-between items-center">
             <span className="flex items-center gap-2">
@@ -325,7 +307,6 @@ const App: React.FC = () => {
          </div>
       </div>
 
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -366,7 +347,6 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {(view === 'new' || view === 'edit') && (
           <div className="animate-fade-in-up">
@@ -419,7 +399,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="bg-white border-t border-slate-200 mt-auto">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-slate-500">

@@ -9,12 +9,15 @@ export const initSupabase = (config: SupabaseConfig) => {
   try {
     if (!config.supabaseUrl || !config.supabaseKey) return false;
     
-    // Basic formatting cleanup
+    // Basic formatting cleanup (Trim whitespace)
     const url = config.supabaseUrl.trim();
     const key = config.supabaseKey.trim();
 
+    // Verificação simples se parece uma URL
+    if (!url.startsWith('http')) return false;
+
     supabase = createClient(url, key);
-    console.log("Supabase initialized successfully");
+    console.log("Supabase initialized successfully with: ", url);
     return true;
   } catch (error) {
     console.error("Error initializing Supabase:", error);
