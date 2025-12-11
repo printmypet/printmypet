@@ -92,8 +92,7 @@ export const fetchColorsFromSupabase = async (): Promise<PartsColors | null> => 
 
 export const addColorToSupabase = async (partType: string, name: string, hex: string) => {
   if (!supabase) return;
-  // Use a default high position to put it at the end (or trigger a reorder logic later)
-  // For simplicity, we just insert.
+  // Use a default high position to put it at the end
   const { error } = await supabase.from('colors').insert([{ part_type: partType, name, hex, position: 9999 }]);
   if (error) throw error;
 };
