@@ -183,7 +183,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sqlParts = [
-      "-- SCRIPT DE CONFIGURAÇÃO - PRINTMY[PET]3D (v4)",
+      "-- SCRIPT DE CONFIGURAÇÃO - PRINTMY[PET]3D (v5)",
       "",
       "-- 1. Tabela de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (",
@@ -275,12 +275,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "    ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;",
       "  END IF;",
       "END",
-      "$$;",
-      "",
-      "-- 7. Dados Iniciais",
-      "INSERT INTO public.textures (name) VALUES",
-      "('Liso'), ('Hexagonal'), ('Listrado'), ('Pontilhado'), ('Voronoi')",
-      "ON CONFLICT (name) DO NOTHING;"
+      "$$;"
     ];
     
     navigator.clipboard.writeText(sqlParts.join('\n'));
@@ -419,7 +414,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- SCRIPT DE CONFIGURAÇÃO (v4)
+{`-- SCRIPT DE CONFIGURAÇÃO (v5)
 -- (Clique no botão copiar para ver tudo)
 CREATE TABLE IF NOT EXISTS public.customers (...);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric;
