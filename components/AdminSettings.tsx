@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User } from 'lucide-react';
-import { PartsColors, SupabaseConfig, Texture, ColorOption, AppUser } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User, TrendingUp, DollarSign, Package, Truck, Calendar } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { PartsColors, SupabaseConfig, Texture, ColorOption, AppUser, Order } from '../types';
 import { Button } from './ui/Button';
 import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions, registerUser } from '../services/supabase';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,6 +16,7 @@ interface AdminSettingsProps {
   onRefreshColors?: () => void;
   isOnline: boolean;
   currentUser: AppUser | null;
+  orders?: Order[]; // Adicionado para relatórios
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ 
@@ -25,9 +27,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   onConfigUpdate,
   onRefreshColors,
   isOnline,
-  currentUser
+  currentUser,
+  orders = []
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'cloud' | 'testing' | 'users'>(() => {
+  const [activeTab, setActiveTab] = useState<'products' | 'cloud' | 'testing' | 'users' | 'reports'>(() => {
     return localStorage.getItem('app-supabase-config') ? 'products' : 'cloud';
   });
   
@@ -71,7 +74,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   useEffect(() => {
     // If user is not admin and tries to access restricted tabs, switch to products
-    if (!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users')) {
+    if (!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports')) {
        setActiveTab('products');
     }
   }, [isAdmin, activeTab]);
@@ -94,6 +97,54 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     const env = localStorage.getItem('app-env-mode') as 'prod' | 'test';
     if (env) setCurrentEnv(env);
   }, []);
+
+  // --- Financial Reports Logic ---
+  const financialData = useMemo(() => {
+    const data = {
+        totalPaid: 0,
+        totalPending: 0,
+        paidShipping: 0,
+        paidProducts: 0,
+        pendingShipping: 0,
+        pendingProducts: 0,
+        totalOrders: orders.length,
+        paidOrdersCount: 0,
+    };
+
+    orders.forEach(order => {
+        const total = order.price || 0;
+        const shipping = order.shippingCost || 0;
+        const products = Math.max(0, total - shipping);
+
+        if (order.isPaid) {
+            data.totalPaid += total;
+            data.paidShipping += shipping;
+            data.paidProducts += products;
+            data.paidOrdersCount += 1;
+        } else {
+            data.totalPending += total;
+            data.pendingShipping += shipping;
+            data.pendingProducts += products;
+        }
+    });
+    return data;
+  }, [orders]);
+
+  const chartDataStatus = [
+    { name: 'Pago', valor: financialData.totalPaid },
+    { name: 'Pendente', valor: financialData.totalPending },
+  ];
+
+  const chartDataComposition = [
+    { name: 'Produtos (Pago)', value: financialData.paidProducts },
+    { name: 'Frete (Pago)', value: financialData.paidShipping },
+    { name: 'Produtos (Pendente)', value: financialData.pendingProducts },
+    { name: 'Frete (Pendente)', value: financialData.pendingShipping },
+  ].filter(i => i.value > 0);
+
+  const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  // --- Handlers ---
 
   const handleSaveCloudConfig = async (e: React.FormEvent, type: 'prod' | 'test') => {
     e.preventDefault();
@@ -305,6 +356,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const partLabels: Record<keyof PartsColors, string> = { base: 'Base', ball: 'Bola', top: 'Tampa/Topo' };
   const partIcons: Record<keyof PartsColors, React.ReactNode> = { base: <Box className="w-4 h-4" />, ball: <Circle className="w-4 h-4" />, top: <Triangle className="w-4 h-4" /> };
 
+  const COLORS_PIE = ['#4F46E5', '#3B82F6', '#F59E0B', '#FCD34D'];
+
   return (
     <div className="space-y-8 animate-fade-in-up">
       <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -329,6 +382,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
             {isAdmin && (
              <>
                <button
+                  onClick={() => setActiveTab('reports')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'reports' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+               >
+                  Relatórios
+              </button>
+               <button
                   onClick={() => setActiveTab('users')}
                   className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'users' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
                >
@@ -351,11 +410,142 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         </div>
       </div>
 
-      {!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users') && (
+      {!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports') && (
         <div className="p-8 text-center bg-red-50 border border-red-200 rounded-lg text-red-700">
            <ShieldAlert className="w-12 h-12 mx-auto mb-2 opacity-50" />
            <h3 className="font-bold">Acesso Negado</h3>
            <p>Você não tem permissão para acessar esta área.</p>
+        </div>
+      )}
+
+      {/* --- REPORTS DASHBOARD TAB --- */}
+      {isAdmin && activeTab === 'reports' && (
+        <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+                 <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
+                    <TrendingUp className="w-6 h-6" />
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-bold text-slate-900">Dashboard Financeiro</h3>
+                    <p className="text-sm text-slate-500">Visão geral de faturamento, pendências e custos.</p>
+                 </div>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+                    <div className="relative z-10">
+                        <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
+                           <CheckCircle className="w-4 h-4 text-green-500" /> Total Pago
+                        </p>
+                        <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatCurrency(financialData.totalPaid)}</h3>
+                        <p className="text-xs text-green-600 mt-1 font-medium">{financialData.paidOrdersCount} pedidos pagos</p>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+                    <div className="relative z-10">
+                        <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
+                           <AlertTriangle className="w-4 h-4 text-yellow-500" /> A Receber
+                        </p>
+                        <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatCurrency(financialData.totalPending)}</h3>
+                        <p className="text-xs text-yellow-600 mt-1 font-medium">Pendente de pagamento</p>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+                    <div className="relative z-10">
+                        <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
+                           <Package className="w-4 h-4 text-indigo-500" /> Prod. Vendidos (Pago)
+                        </p>
+                        <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatCurrency(financialData.paidProducts)}</h3>
+                        <p className="text-xs text-slate-400 mt-1">Líquido de frete</p>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                     <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+                     <div className="relative z-10">
+                        <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
+                           <Truck className="w-4 h-4 text-blue-500" /> Frete Repassado (Pago)
+                        </p>
+                        <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatCurrency(financialData.paidShipping)}</h3>
+                        <p className="text-xs text-slate-400 mt-1">Valor destinado a envio</p>
+                     </div>
+                </div>
+            </div>
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Status Chart */}
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-6">Status Financeiro Geral</h4>
+                    <div className="h-72 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartDataStatus} margin={{top: 20, right: 30, left: 20, bottom: 5}}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                                <YAxis 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tickFormatter={(val) => `R$ ${val}`} 
+                                    width={80}
+                                />
+                                <Tooltip 
+                                    cursor={{fill: '#f8fafc'}}
+                                    formatter={(value: number) => formatCurrency(value)}
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                />
+                                <Bar dataKey="valor" radius={[4, 4, 0, 0]}>
+                                    {chartDataStatus.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={index === 0 ? '#22c55e' : '#eab308'} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Composition Chart */}
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-6">Composição dos Valores</h4>
+                    <div className="h-72 w-full flex flex-col md:flex-row items-center justify-center">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={chartDataComposition}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={2}
+                                    dataKey="value"
+                                >
+                                    {chartDataComposition.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS_PIE[index % COLORS_PIE.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip 
+                                    formatter={(value: number) => formatCurrency(value)}
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                        <div className="flex flex-col gap-2 text-xs text-slate-600 min-w-[150px]">
+                            {chartDataComposition.map((entry, index) => (
+                                <div key={entry.name} className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS_PIE[index % COLORS_PIE.length] }}></span>
+                                    <span>{entry.name}: <strong>{formatCurrency(entry.value)}</strong></span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
       )}
 

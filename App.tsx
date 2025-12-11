@@ -391,6 +391,7 @@ const App: React.FC = () => {
             onRefreshColors={refreshConfig}
             isOnline={isOnline}
             currentUser={currentUser}
+            orders={orders}
           />
         )}
       </main>
