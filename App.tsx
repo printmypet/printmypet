@@ -45,26 +45,46 @@ const App: React.FC = () => {
 
   // Init Supabase and Load Data
   useEffect(() => {
-    const supabaseConfigStr = localStorage.getItem('app-supabase-config');
+    const localConfigStr = localStorage.getItem('app-supabase-config');
+    
+    // Check for Environment Variables (Vercel / .env)
+    // Safely access import.meta.env using optional chaining to prevent undefined error
+    const envConfig: SupabaseConfig = {
+      supabaseUrl: (import.meta as any).env?.VITE_SUPABASE_URL || '',
+      supabaseKey: (import.meta as any).env?.VITE_SUPABASE_KEY || ''
+    };
+
+    let configToUse: SupabaseConfig | null = null;
     let connected = false;
     let unsubscribe = () => {};
 
-    if (supabaseConfigStr) {
+    // Priority: 1. LocalStorage (Manual override), 2. Environment Variables
+    if (localConfigStr) {
       try {
-        const config: SupabaseConfig = JSON.parse(supabaseConfigStr);
-        connected = initSupabase(config);
-        setIsOnline(connected);
+        configToUse = JSON.parse(localConfigStr);
       } catch (e) {
-        console.error("Invalid config", e);
-        setIsOnline(false);
+        console.error("Invalid local config", e);
       }
+    } else if (envConfig.supabaseUrl && envConfig.supabaseKey) {
+      configToUse = envConfig;
+    }
+
+    if (configToUse) {
+      connected = initSupabase(configToUse);
+      setIsOnline(connected);
     } else {
-      setShowSetupBanner(true);
       setIsOnline(false);
     }
 
-    if (connected) {
+    // Logic for Setup Banner
+    // Show banner only if NOT online AND no LocalStorage config existed (meaning user hasn't tried setting it up yet)
+    if (!connected && !localConfigStr) {
+      setShowSetupBanner(true);
+    } else {
       setShowSetupBanner(false);
+    }
+
+    if (connected) {
       // Subscribe to Supabase Realtime
       unsubscribe = subscribeToOrders((cloudOrders) => {
         setOrders(cloudOrders);
