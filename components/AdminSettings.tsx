@@ -429,7 +429,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 -- (Clique no botão copiar para ver tudo)
 CREATE TABLE IF NOT EXISTS public.customers (...);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric;
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean;`}
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean;
+-- (+ Migrações automáticas de colunas)`}
                     </pre>
                     <button 
                         onClick={copySql}
