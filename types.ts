@@ -1,5 +1,6 @@
 
 export type ColorOption = {
+  id?: string; // ID from Database
   name: string;
   hex: string;
 };
@@ -34,6 +35,7 @@ export const DEFAULT_TEXTURES = [
 export type OrderStatus = 'Pendente' | 'Em Impressão' | 'Acabamento' | 'Concluído' | 'Entregue';
 
 export interface Customer {
+  id?: string; // Database ID
   name: string;
   email: string;
   phone: string;
@@ -68,6 +70,7 @@ export interface Order {
   id: string;
   createdAt: string;
   customer: Customer;
+  customerId?: string; // Foreign Key
   products: ProductConfig[]; // Changed from single product to array
   status: OrderStatus;
   price: number; // Total Value (Products + Shipping)

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Cloud, Database, AlertCircle } from 'lucide-react';
@@ -14,7 +15,8 @@ import {
   addOrderToSupabase, 
   updateOrderStatusInSupabase, 
   updateOrderPaidInSupabase, 
-  deleteOrderFromSupabase 
+  deleteOrderFromSupabase,
+  fetchColorsFromSupabase
 } from './services/supabase';
 
 const App: React.FC = () => {
@@ -48,7 +50,6 @@ const App: React.FC = () => {
     const localConfigStr = localStorage.getItem('app-supabase-config');
     
     // Check for Environment Variables (Vercel / .env)
-    // Safely access import.meta.env using optional chaining to prevent undefined error
     const envConfig: SupabaseConfig = {
       supabaseUrl: (import.meta as any).env?.VITE_SUPABASE_URL || '',
       supabaseKey: (import.meta as any).env?.VITE_SUPABASE_KEY || ''
@@ -58,7 +59,6 @@ const App: React.FC = () => {
     let connected = false;
     let unsubscribe = () => {};
 
-    // Priority: 1. LocalStorage (Manual override), 2. Environment Variables
     if (localConfigStr) {
       try {
         configToUse = JSON.parse(localConfigStr);
@@ -76,8 +76,6 @@ const App: React.FC = () => {
       setIsOnline(false);
     }
 
-    // Logic for Setup Banner
-    // Show banner only if NOT online AND no LocalStorage config existed (meaning user hasn't tried setting it up yet)
     if (!connected && !localConfigStr) {
       setShowSetupBanner(true);
     } else {
@@ -85,17 +83,28 @@ const App: React.FC = () => {
     }
 
     if (connected) {
-      // Subscribe to Supabase Realtime
+      // 1. Subscribe to Orders
       unsubscribe = subscribeToOrders((cloudOrders) => {
         setOrders(cloudOrders);
       });
+
+      // 2. Fetch Colors from DB (Replace local storage if successful)
+      fetchColorsFromSupabase().then(dbColors => {
+        if (dbColors) {
+          // Verify if there are any colors. If empty (fresh DB), maybe don't overwrite default local just yet?
+          // But usually we want the DB to be source of truth.
+          if (dbColors.base.length > 0 || dbColors.ball.length > 0) {
+            setPartsColors(dbColors);
+          }
+        }
+      });
+
     } else {
       // Fallback to Local Storage
       const savedOrders = localStorage.getItem('3d-print-orders');
       if (savedOrders) {
         try {
           const parsed = JSON.parse(savedOrders);
-          // Migration logic for old structure if necessary
           const migratedOrders = parsed.map((order: any) => {
             if (order.products) return order;
             if (order.product) {
@@ -118,7 +127,7 @@ const App: React.FC = () => {
     return () => {
       unsubscribe();
     };
-  }, [reloadKey]); // Depend on reloadKey to re-run
+  }, [reloadKey]); 
 
   // Save Orders to LocalStorage (Only if Offline)
   useEffect(() => {
@@ -127,7 +136,7 @@ const App: React.FC = () => {
     }
   }, [orders, isOnline]);
 
-  // Save Config to LocalStorage
+  // Save Config to LocalStorage (Backup/Offline)
   useEffect(() => {
     localStorage.setItem('app-parts-colors', JSON.stringify(partsColors));
   }, [partsColors]);
@@ -137,8 +146,15 @@ const App: React.FC = () => {
   }, [availableTextures]);
 
   const handleConfigUpdate = () => {
-    // Increment key to trigger useEffect re-run
     setReloadKey(prev => prev + 1);
+  };
+
+  // Function to refresh colors specifically (called after admin edits)
+  const refreshColors = async () => {
+    if (isOnline) {
+       const dbColors = await fetchColorsFromSupabase();
+       if (dbColors) setPartsColors(dbColors);
+    }
   };
 
   const handleSaveOrder = async (newOrderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
@@ -153,7 +169,7 @@ const App: React.FC = () => {
       try {
         await addOrderToSupabase(newOrder);
       } catch (e) {
-        alert("Erro ao salvar no Supabase. Verifique sua conexão ou configuração.");
+        alert("Erro ao salvar no Supabase. Verifique sua conexão.");
         return;
       }
     } else {
@@ -219,13 +235,13 @@ const App: React.FC = () => {
            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm font-medium">O sistema está rodando em modo offline. Conecte ao Supabase para sincronizar pedidos.</span>
+                <span className="text-sm font-medium">O sistema está rodando em modo offline. Conecte ao Supabase para sincronizar.</span>
               </div>
               <button 
                 onClick={() => setView('admin')} 
                 className="bg-white text-indigo-700 px-4 py-1.5 rounded-full text-xs font-bold hover:bg-indigo-50 transition-colors whitespace-nowrap"
               >
-                Configurar Nuvem Agora
+                Configurar Nuvem
               </button>
            </div>
         </div>
@@ -309,6 +325,8 @@ const App: React.FC = () => {
               onUpdatePartsColors={setPartsColors}
               onUpdateTextures={setAvailableTextures}
               onConfigUpdate={handleConfigUpdate}
+              onRefreshColors={refreshColors}
+              isOnline={isOnline}
             />
           ) : (
             <AdminLogin onLogin={() => setIsAdminAuthenticated(true)} />

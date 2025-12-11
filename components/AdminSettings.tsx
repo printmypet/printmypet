@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { PartsColors, SupabaseConfig } from '../types';
 import { Button } from './ui/Button';
-import { testConnection } from '../services/supabase';
+import { testConnection, addColorToSupabase, deleteColorFromSupabase } from '../services/supabase';
 
 interface AdminSettingsProps {
   partsColors: PartsColors;
@@ -11,6 +11,8 @@ interface AdminSettingsProps {
   onUpdatePartsColors: (colors: PartsColors) => void;
   onUpdateTextures: (textures: string[]) => void;
   onConfigUpdate: () => void;
+  onRefreshColors?: () => void;
+  isOnline: boolean;
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ 
@@ -18,20 +20,20 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   textures, 
   onUpdatePartsColors, 
   onUpdateTextures,
-  onConfigUpdate
+  onConfigUpdate,
+  onRefreshColors,
+  isOnline
 }) => {
-  // Automatically select 'cloud' tab if not configured
   const [activeTab, setActiveTab] = useState<'products' | 'cloud'>(() => {
     return localStorage.getItem('app-supabase-config') ? 'products' : 'cloud';
   });
   
-  // Local state for product config
   const [activePart, setActivePart] = useState<keyof PartsColors>('base');
   const [newColorName, setNewColorName] = useState('');
   const [newColorHex, setNewColorHex] = useState('#000000');
   const [newTextureName, setNewTextureName] = useState('');
+  const [isProcessingColor, setIsProcessingColor] = useState(false);
 
-  // Local state for Cloud Config (Supabase)
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>({
     supabaseUrl: '',
     supabaseKey: ''
@@ -53,31 +55,24 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     setIsTesting(true);
     setTestResult(null);
 
-    // 1. Basic Validation
     if (!supabaseConfig.supabaseUrl || !supabaseConfig.supabaseKey) {
        setIsTesting(false);
        setTestResult({ success: false, message: 'Preencha ambos os campos.' });
        return;
     }
 
-    // 2. Test Connection
     const result = await testConnection(supabaseConfig);
     
     setIsTesting(false);
     setTestResult(result);
 
     if (result.success) {
-      // 3. Save if success
-      // Remove trailing spaces just in case
       const cleanConfig = {
         supabaseUrl: supabaseConfig.supabaseUrl.trim(),
         supabaseKey: supabaseConfig.supabaseKey.trim()
       };
-      
       localStorage.setItem('app-supabase-config', JSON.stringify(cleanConfig));
       setIsCloudConfigured(true);
-      
-      // Update App state without reloading page to avoid 404 errors in preview environments
       onConfigUpdate();
     }
   };
@@ -90,30 +85,54 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         supabaseUrl: '',
         supabaseKey: ''
       });
-      onConfigUpdate(); // Update App state
+      onConfigUpdate();
     }
   };
 
-  const handleAddColor = (e: React.FormEvent) => {
+  const handleAddColor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newColorName && newColorHex) {
-      const updatedList = [...partsColors[activePart], { name: newColorName, hex: newColorHex }];
-      onUpdatePartsColors({
-        ...partsColors,
-        [activePart]: updatedList
-      });
-      setNewColorName('');
-      setNewColorHex('#000000');
+      setIsProcessingColor(true);
+      try {
+        if (isOnline) {
+          await addColorToSupabase(activePart, newColorName, newColorHex);
+          if (onRefreshColors) await onRefreshColors();
+        } else {
+          // Fallback Offline
+          const updatedList = [...partsColors[activePart], { name: newColorName, hex: newColorHex }];
+          onUpdatePartsColors({
+            ...partsColors,
+            [activePart]: updatedList
+          });
+        }
+        setNewColorName('');
+        setNewColorHex('#000000');
+      } catch (e) {
+        alert("Erro ao adicionar cor. Verifique o console.");
+        console.error(e);
+      } finally {
+        setIsProcessingColor(false);
+      }
     }
   };
 
-  const handleDeleteColor = (hexToDelete: string) => {
+  const handleDeleteColor = async (color: any) => {
     if (confirm('Tem certeza que deseja remover esta cor?')) {
-      const updatedList = partsColors[activePart].filter(c => c.hex !== hexToDelete);
-      onUpdatePartsColors({
-        ...partsColors,
-        [activePart]: updatedList
-      });
+      try {
+        if (isOnline && color.id) {
+           await deleteColorFromSupabase(color.id);
+           if (onRefreshColors) await onRefreshColors();
+        } else {
+           const updatedList = partsColors[activePart].filter(c => c.hex !== color.hex);
+           onUpdatePartsColors({
+             ...partsColors,
+             [activePart]: updatedList
+           });
+        }
+      } catch (e) {
+        alert("Erro ao remover cor.");
+        console.error(e);
+      }
     }
   };
 
@@ -137,22 +156,60 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sql = `
-CREATE TABLE public.orders (
-  id UUID PRIMARY KEY,
-  "createdAt" TEXT,
-  status TEXT,
-  price NUMERIC,
-  "shippingCost" NUMERIC,
-  "isPaid" BOOLEAN,
-  customer JSONB,
-  products JSONB
+-- 1. Tabela de Clientes
+CREATE TABLE public.customers (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  name text NOT NULL,
+  cpf text UNIQUE,
+  email text,
+  phone text,
+  type text, -- 'final' or 'partner'
+  partner_name text,
+  instagram text,
+  -- Endereço
+  address_full text,
+  zip_code text,
+  street text,
+  number text,
+  complement text,
+  neighborhood text,
+  city text,
+  state text
 );
 
--- Habilitar Realtime
-alter publication supabase_realtime add table public.orders;
+-- 2. Tabela de Cores
+CREATE TABLE public.colors (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  name text NOT NULL,
+  hex text NOT NULL,
+  part_type text NOT NULL -- 'base', 'ball', 'top'
+);
+
+-- 3. Tabela de Pedidos
+CREATE TABLE public.orders (
+  id uuid PRIMARY KEY, -- Mantemos ID gerado no front por enquanto
+  created_at timestamptz DEFAULT now(),
+  status text,
+  price numeric,
+  shipping_cost numeric,
+  is_paid boolean,
+  products jsonb, -- Mantemos produtos configurados como JSON
+  customer_id uuid REFERENCES public.customers(id),
+  customer jsonb -- Mantido temporariamente para legado
+);
+
+-- Configurações de Segurança
+ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
+
+-- Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
     `;
     navigator.clipboard.writeText(sql.trim());
-    alert("SQL copiado para a área de transferência!");
+    alert("SQL Atualizado copiado para a área de transferência!");
   };
 
   const partLabels: Record<keyof PartsColors, string> = {
@@ -229,7 +286,6 @@ alter publication supabase_realtime add table public.orders;
                             placeholder="https://xyz.supabase.co"
                             required
                         />
-                         <p className="text-xs text-slate-400 mt-1">Copie do Supabase: Project Settings {'>'} API {'>'} URL</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">API Key (public/anon)</label>
@@ -241,7 +297,6 @@ alter publication supabase_realtime add table public.orders;
                             placeholder="eyJxh..."
                             required
                         />
-                         <p className="text-xs text-slate-400 mt-1">Copie do Supabase: Project Settings {'>'} API {'>'} anon/public key</p>
                     </div>
 
                     {testResult && (
@@ -284,27 +339,58 @@ alter publication supabase_realtime add table public.orders;
                 </div>
                 
                 <p className="text-sm text-slate-400 mb-4">
-                    Para que o sistema funcione, você precisa criar a tabela no editor SQL do Supabase. Copie o código abaixo e execute lá:
+                    Copie o SQL abaixo e rode no Supabase para criar as tabelas de Clientes e Cores separadas.
                 </p>
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`CREATE TABLE public.orders (
-  id UUID PRIMARY KEY,
-  "createdAt" TEXT,
-  status TEXT,
-  price NUMERIC,
-  "shippingCost" NUMERIC,
-  "isPaid" BOOLEAN,
-  customer JSONB,
-  products JSONB
+{`-- 1. Clientes
+CREATE TABLE public.customers (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  name text NOT NULL,
+  cpf text UNIQUE,
+  email text,
+  phone text,
+  type text,
+  partner_name text,
+  instagram text,
+  address_full text,
+  zip_code text,
+  street text,
+  number text,
+  complement text,
+  neighborhood text,
+  city text,
+  state text
 );
 
--- Habilitar Realtime
-alter publication supabase_realtime add table public.orders;
+-- 2. Cores
+CREATE TABLE public.colors (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  name text NOT NULL,
+  hex text NOT NULL,
+  part_type text NOT NULL
+);
 
--- Habilitar Acesso Público (para app simples)
-ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;`}
+-- 3. Pedidos (Atualizado)
+CREATE TABLE public.orders (
+  id uuid PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  status text,
+  price numeric,
+  shipping_cost numeric,
+  is_paid boolean,
+  products jsonb,
+  customer_id uuid REFERENCES public.customers(id)
+);
+
+-- Configurações
+ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;`}
                     </pre>
                     <button 
                         onClick={copySql}
@@ -316,7 +402,7 @@ ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;`}
                 </div>
                 
                 <div className="mt-4 text-xs text-slate-500">
-                   * Não esqueça de desabilitar RLS (última linha do SQL) para este app funcionar sem login de usuário final.
+                   * Se as tabelas já existirem, você precisará adaptá-las ou apagá-las antes.
                 </div>
             </div>
         </div>
@@ -326,11 +412,12 @@ ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;`}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Color Management */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-4 bg-slate-50 border-b border-slate-200">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
             <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
               <Palette className="w-5 h-5 text-indigo-600" />
-              Catálogo de Cores por Parte
+              Catálogo de Cores
             </h3>
+            {isOnline && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full border border-emerald-200">Salvo na Nuvem</span>}
           </div>
 
           <div className="border-b border-slate-200 px-4 pt-4">
@@ -378,8 +465,9 @@ ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;`}
                   className="h-10 w-20 p-1 rounded-md border border-slate-300 cursor-pointer bg-white"
                 />
               </div>
-              <Button type="submit" size="md">
-                <Plus className="w-4 h-4 mr-1" /> Adicionar
+              <Button type="submit" size="md" disabled={isProcessingColor}>
+                {isProcessingColor ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />} 
+                Adicionar
               </Button>
             </form>
 
@@ -388,7 +476,7 @@ ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;`}
                 Cores Cadastradas - {partLabels[activePart]} ({partsColors[activePart].length})
               </label>
               {partsColors[activePart].map((color) => (
-                <div key={color.hex} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg hover:border-slate-300 transition-colors shadow-sm">
+                <div key={color.hex + color.name} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg hover:border-slate-300 transition-colors shadow-sm">
                   <div className="flex items-center gap-3">
                     <div 
                       className="w-8 h-8 rounded-full border border-slate-200 shadow-inner" 
@@ -400,7 +488,7 @@ ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;`}
                     </div>
                   </div>
                   <button 
-                    onClick={() => handleDeleteColor(color.hex)}
+                    onClick={() => handleDeleteColor(color)}
                     className="text-slate-400 hover:text-red-600 transition-colors p-2"
                     title="Remover cor"
                   >
@@ -415,12 +503,12 @@ ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;`}
           </div>
         </div>
 
-        {/* Texture Management */}
+        {/* Texture Management (Keep Local for now as per prompt focus on Colors/Clients) */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 bg-slate-50 border-b border-slate-200">
             <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
               <Layers className="w-5 h-5 text-indigo-600" />
-              Catálogo de Texturas
+              Catálogo de Texturas (Local)
             </h3>
           </div>
           

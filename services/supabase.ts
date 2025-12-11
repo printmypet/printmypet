@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseConfig, Order } from '../types';
+import { SupabaseConfig, Order, Customer, PartsColors, ColorOption } from '../types';
 
 let supabase: SupabaseClient | undefined;
 
@@ -35,19 +35,14 @@ export const testConnection = async (config: SupabaseConfig): Promise<{ success:
     const tempClient = createClient(url, key);
     
     // Try to fetch just one ID to verify connection and permissions
-    // We limit to 0 just to check the API response/headers without needing real data
     const { error } = await tempClient.from('orders').select('id').limit(1);
 
     if (error) {
-      // Analyze specific Supabase errors
       if (error.code === 'PGRST204' || error.message?.includes('does not exist')) {
-        return { success: false, message: 'Conexão OK, mas a tabela "orders" não existe. Rode o script SQL no Supabase.' };
+        return { success: false, message: 'Conexão OK, mas as tabelas não existem. Rode o novo script SQL.' };
       }
       if (error.message?.includes('JWT')) {
         return { success: false, message: 'Chave de API (Anon Key) inválida ou expirada.' };
-      }
-      if (error.message?.includes('FetchError') || error.message?.includes('Network request failed')) {
-         return { success: false, message: 'Erro de rede. Verifique a URL do projeto.' };
       }
       return { success: false, message: `Erro do Supabase: ${error.message}` };
     }
@@ -60,16 +55,103 @@ export const testConnection = async (config: SupabaseConfig): Promise<{ success:
 
 export const getClient = () => supabase;
 
-// Subscribe to Orders Table
+// --- Colors Management ---
+
+export const fetchColorsFromSupabase = async (): Promise<PartsColors | null> => {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.from('colors').select('*');
+  
+  if (error || !data) {
+    console.error('Error fetching colors:', error);
+    return null;
+  }
+
+  // Transform flat list to PartsColors object
+  const newColors: PartsColors = { base: [], ball: [], top: [] };
+  
+  data.forEach((item: any) => {
+    const color: ColorOption = { id: item.id, name: item.name, hex: item.hex };
+    if (item.part_type === 'base') newColors.base.push(color);
+    if (item.part_type === 'ball') newColors.ball.push(color);
+    if (item.part_type === 'top') newColors.top.push(color);
+  });
+
+  return newColors;
+};
+
+export const addColorToSupabase = async (partType: string, name: string, hex: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('colors').insert([{ part_type: partType, name, hex }]);
+  if (error) throw error;
+};
+
+export const deleteColorFromSupabase = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('colors').delete().eq('id', id);
+  if (error) throw error;
+};
+
+
+// --- Customer Management ---
+
+export const upsertCustomer = async (customer: Customer): Promise<string> => {
+  if (!supabase) throw new Error("Supabase not initialized");
+
+  // 1. Check if customer exists by CPF
+  const { data: existing } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('cpf', customer.cpf)
+    .single();
+
+  const customerPayload = {
+    name: customer.name,
+    email: customer.email,
+    phone: customer.phone,
+    cpf: customer.cpf,
+    instagram: customer.instagram,
+    type: customer.type,
+    partner_name: customer.partnerName,
+    address_full: customer.address,
+    zip_code: customer.zipCode,
+    street: customer.street,
+    number: customer.number,
+    complement: customer.complement,
+    neighborhood: customer.neighborhood,
+    city: customer.city,
+    state: customer.state
+  };
+
+  if (existing) {
+    // Update
+    await supabase.from('customers').update(customerPayload).eq('id', existing.id);
+    return existing.id;
+  } else {
+    // Insert
+    const { data: newCustomer, error } = await supabase
+      .from('customers')
+      .insert([customerPayload])
+      .select('id')
+      .single();
+    
+    if (error) throw error;
+    return newCustomer.id;
+  }
+};
+
+
+// --- Order Management ---
+
 export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
   if (!supabase) return () => {};
 
-  // 1. Fetch initial data
   const fetchOrders = async () => {
+    // Join with customers table
     const { data, error } = await supabase!
       .from('orders')
-      .select('*')
-      .order('createdAt', { ascending: false }); // Supabase uses specific syntax for ordering
+      .select('*, customers(*)')
+      .order('createdAt', { ascending: false });
 
     if (error) {
       console.error('Error fetching orders:', error);
@@ -77,13 +159,37 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
     }
     
     if (data) {
-       onUpdate(data as Order[]);
+       // Map Supabase response to Order Type
+       const mappedOrders: Order[] = data.map((row: any) => {
+          // If customer relationship exists, use it. Otherwise fallback to legacy JSON or placeholder
+          let customerData: Customer = row.customers;
+          
+          if (!customerData && row.customer) {
+            // Legacy JSON fallback
+            customerData = row.customer;
+          } else if (customerData) {
+             // Map DB columns back to frontend camelCase if needed (though Supabase JS usually handles JSONB well, 
+             // here customers is a relation, so columns come as snake_case probably unless configured)
+             // Let's ensure address mapping
+             customerData = {
+                ...customerData,
+                partnerName: (customerData as any).partner_name || customerData.partnerName,
+                zipCode: (customerData as any).zip_code || customerData.zipCode,
+                address: (customerData as any).address_full || customerData.address,
+             };
+          }
+
+          return {
+            ...row,
+            customer: customerData
+          };
+       });
+       onUpdate(mappedOrders);
     }
   };
 
   fetchOrders();
 
-  // 2. Subscribe to Realtime changes
   const channel = supabase
     .channel('orders_channel')
     .on(
@@ -100,13 +206,31 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
   };
 };
 
-// Add Order
 export const addOrderToSupabase = async (order: Order) => {
   if (!supabase) return;
 
+  // 1. Ensure Customer Exists
+  const customerId = await upsertCustomer(order.customer);
+
+  // 2. Prepare Order Payload
+  // We remove the full 'customer' object from the insert payload to avoid duplicating data in JSONB if we want clean separation
+  // But for safety/redundancy during migration, we can keep it. 
+  // Let's prioritize the relation.
+  
+  const orderPayload = {
+    id: order.id,
+    createdAt: order.createdAt,
+    status: order.status,
+    price: order.price,
+    shippingCost: order.shippingCost,
+    isPaid: order.isPaid,
+    customer_id: customerId, // Foreign Key
+    products: order.products // Keep products as JSON for now
+  };
+
   const { error } = await supabase
     .from('orders')
-    .insert([order]);
+    .insert([orderPayload]);
 
   if (error) {
     console.error("Error adding order to Supabase: ", error);
@@ -117,41 +241,17 @@ export const addOrderToSupabase = async (order: Order) => {
 // Update Order Status
 export const updateOrderStatusInSupabase = async (id: string, status: string) => {
   if (!supabase) return;
-  
-  const { error } = await supabase
-    .from('orders')
-    .update({ status })
-    .eq('id', id);
-
-  if (error) {
-     console.error("Error updating status: ", error);
-  }
+  await supabase.from('orders').update({ status }).eq('id', id);
 };
 
 // Update Order Paid Status
 export const updateOrderPaidInSupabase = async (id: string, isPaid: boolean) => {
   if (!supabase) return;
-  
-  const { error } = await supabase
-    .from('orders')
-    .update({ isPaid })
-    .eq('id', id);
-
-  if (error) {
-     console.error("Error updating paid status: ", error);
-  }
+  await supabase.from('orders').update({ isPaid }).eq('id', id);
 };
 
 // Delete Order
 export const deleteOrderFromSupabase = async (id: string) => {
   if (!supabase) return;
-  
-  const { error } = await supabase
-    .from('orders')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-     console.error("Error deleting order: ", error);
-  }
+  await supabase.from('orders').delete().eq('id', id);
 };
