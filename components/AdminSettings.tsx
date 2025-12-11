@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, RefreshCw } from 'lucide-react';
-import { PartsColors, SupabaseConfig, Texture, ColorOption } from '../types';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User } from 'lucide-react';
+import { PartsColors, SupabaseConfig, Texture, ColorOption, AppUser } from '../types';
 import { Button } from './ui/Button';
-import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions } from '../services/supabase';
+import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions, registerUser } from '../services/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AdminSettingsProps {
@@ -14,6 +14,7 @@ interface AdminSettingsProps {
   onConfigUpdate: () => void;
   onRefreshColors?: () => void;
   isOnline: boolean;
+  currentUser: AppUser | null;
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ 
@@ -23,9 +24,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   onUpdateTextures,
   onConfigUpdate,
   onRefreshColors,
-  isOnline
+  isOnline,
+  currentUser
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'cloud' | 'testing'>(() => {
+  const [activeTab, setActiveTab] = useState<'products' | 'cloud' | 'testing' | 'users'>(() => {
     return localStorage.getItem('app-supabase-config') ? 'products' : 'cloud';
   });
   
@@ -56,6 +58,23 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{success: boolean; message?: string} | null>(null);
+
+  // User Registration State
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserLogin, setNewUserLogin] = useState('');
+  const [newUserPass, setNewUserPass] = useState('');
+  const [newUserIsAdmin, setNewUserIsAdmin] = useState(false);
+  const [userMsg, setUserMsg] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  const isAdmin = currentUser?.role === 'admin';
+
+  useEffect(() => {
+    // If user is not admin and tries to access restricted tabs, switch to products
+    if (!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users')) {
+       setActiveTab('products');
+    }
+  }, [isAdmin, activeTab]);
 
   useEffect(() => {
     // Load Prod Config
@@ -142,7 +161,37 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     }
   };
 
-  // --- Drag and Drop Handlers (Keep existing logic) ---
+  const handleRegisterUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserMsg(null);
+    setIsRegistering(true);
+
+    if (!newUserName || !newUserLogin || !newUserPass) {
+        setUserMsg({ type: 'error', text: 'Preencha todos os campos obrigatórios.' });
+        setIsRegistering(false);
+        return;
+    }
+
+    const result = await registerUser({
+        name: newUserName,
+        username: newUserLogin,
+        password: newUserPass,
+        role: newUserIsAdmin ? 'admin' : 'user'
+    });
+
+    if (result.success) {
+        setUserMsg({ type: 'success', text: 'Usuário cadastrado com sucesso!' });
+        setNewUserName('');
+        setNewUserLogin('');
+        setNewUserPass('');
+        setNewUserIsAdmin(false);
+    } else {
+        setUserMsg({ type: 'error', text: result.message || 'Erro ao cadastrar.' });
+    }
+    setIsRegistering(false);
+  };
+
+  // --- Drag and Drop Handlers ---
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     setDraggedItemIndex(index);
     e.dataTransfer.effectAllowed = 'move';
@@ -236,117 +285,21 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sqlParts = [
-      "-- SCRIPT DE CONFIGURAÇÃO - PRINTMY[PET]3D (v8 - Ordering Support)",
-      "",
-      "-- 1. Tabela de Clientes",
-      "CREATE TABLE IF NOT EXISTS public.customers (",
-      "  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,",
-      "  created_at timestamptz DEFAULT now(),",
-      "  name text NOT NULL",
-      ");",
-      "",
+      "-- SCRIPT DE CONFIGURAÇÃO (v8)",
+      "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS email text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS phone text;",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS type text DEFAULT 'final';",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS partner_name text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS instagram text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS address_full text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS zip_code text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS street text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS number text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS complement text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS neighborhood text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS city text;",
-      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS state text;",
-      "",
-      "ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;",
-      "ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;",
-      "ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;",
-      "",
-      "ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;",
-      "DROP INDEX IF EXISTS customers_cpf_unique_idx;",
       "CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL AND cpf != '';",
-      "",
-      "-- 2. Tabelas Auxiliares",
-      "CREATE TABLE IF NOT EXISTS public.colors (",
-      "  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,",
-      "  created_at timestamptz DEFAULT now(),",
-      "  name text NOT NULL,",
-      "  hex text NOT NULL,",
-      "  part_type text NOT NULL",
-      ");",
-      "",
-      "-- Adiciona coluna de posição se não existir",
-      "ALTER TABLE public.colors ADD COLUMN IF NOT EXISTS position integer;",
-      "",
-      "CREATE TABLE IF NOT EXISTS public.textures (",
-      "  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,",
-      "  created_at timestamptz DEFAULT now(),",
-      "  name text NOT NULL UNIQUE",
-      ");",
-      "",
-      "-- 3. Tabela de Pedidos",
-      "CREATE TABLE IF NOT EXISTS public.orders (",
-      "  id uuid PRIMARY KEY,",
-      "  created_at timestamptz DEFAULT now(),",
-      "  status text,",
-      "  price numeric,",
-      "  products jsonb,",
-      "  customer jsonb",
-      ");",
-      "",
-      "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric DEFAULT 0;",
-      "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean DEFAULT false;",
-      "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);",
-      "",
-      "-- 4. MIGRAÇÃO SEGURA DE DADOS",
-      "DO $$",
-      "BEGIN",
-      "  -- A. Migrar shippingCost -> shipping_cost",
-      "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shippingCost') THEN",
-      "    UPDATE public.orders SET shipping_cost = \"shippingCost\" WHERE \"shippingCost\" IS NOT NULL;",
-      "    ALTER TABLE public.orders DROP COLUMN \"shippingCost\";",
-      "  END IF;",
-      "",
-      "  -- B. Migrar shippingcost -> shipping_cost",
-      "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shippingcost') THEN",
-      "    UPDATE public.orders SET shipping_cost = shippingcost WHERE shippingcost IS NOT NULL;",
-      "    ALTER TABLE public.orders DROP COLUMN shippingcost;",
-      "  END IF;",
-      "",
-      "  -- C. Migrar isPaid -> is_paid",
-      "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='isPaid') THEN",
-      "    UPDATE public.orders SET is_paid = \"isPaid\" WHERE \"isPaid\" IS NOT NULL;",
-      "    ALTER TABLE public.orders DROP COLUMN \"isPaid\";",
-      "  END IF;",
-      "",
-      "  -- D. Migrar ispaid -> is_paid",
-      "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='ispaid') THEN",
-      "    UPDATE public.orders SET is_paid = ispaid WHERE ispaid IS NOT NULL;",
-      "    ALTER TABLE public.orders DROP COLUMN ispaid;",
-      "  END IF;",
-      "END",
-      "$$;",
-      "",
-      "-- 5. Segurança",
-      "ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;",
-      "ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;",
-      "ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;",
+      "CREATE TABLE IF NOT EXISTS public.colors (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, name text NOT NULL, hex text NOT NULL, part_type text NOT NULL, position integer);",
+      "CREATE TABLE IF NOT EXISTS public.textures (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, name text NOT NULL UNIQUE);",
+      "CREATE TABLE IF NOT EXISTS public.orders (id uuid PRIMARY KEY, status text, price numeric, shipping_cost numeric, is_paid boolean, products jsonb, customer jsonb, customer_id uuid REFERENCES public.customers(id));",
+      "CREATE TABLE IF NOT EXISTS public.app_users (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, username text NOT NULL UNIQUE, password text NOT NULL, role text DEFAULT 'user');",
       "ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;",
-      "",
-      "-- 6. Realtime",
-      "DO $$",
-      "BEGIN",
-      "  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'orders') THEN",
-      "    ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;",
-      "  END IF;",
-      "END",
-      "$$;"
+      "ALTER TABLE public.app_users DISABLE ROW LEVEL SECURITY;"
     ];
     
     navigator.clipboard.writeText(sqlParts.join('\n'));
-    alert("SQL (v8) copiado! Rode no Supabase de Produção ou de Testes.");
+    alert("SQL Simplificado copiado! Use para setup rápido.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = { base: 'Base', ball: 'Bola', top: 'Tampa/Topo' };
@@ -373,22 +326,140 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
             >
                 Produtos
             </button>
-             <button
-                onClick={() => setActiveTab('cloud')}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'cloud' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-            >
-                Nuvem (Prod)
-            </button>
-            <button
-                onClick={() => setActiveTab('testing')}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'testing' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500'}`}
-            >
-                Área de Testes
-            </button>
+            {isAdmin && (
+             <>
+               <button
+                  onClick={() => setActiveTab('users')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'users' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+               >
+                  Usuários
+              </button>
+               <button
+                  onClick={() => setActiveTab('cloud')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'cloud' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+               >
+                  Nuvem (Prod)
+              </button>
+              <button
+                  onClick={() => setActiveTab('testing')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'testing' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500'}`}
+              >
+                  Área de Testes
+              </button>
+             </>
+            )}
         </div>
       </div>
 
-      {activeTab === 'testing' && (
+      {!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users') && (
+        <div className="p-8 text-center bg-red-50 border border-red-200 rounded-lg text-red-700">
+           <ShieldAlert className="w-12 h-12 mx-auto mb-2 opacity-50" />
+           <h3 className="font-bold">Acesso Negado</h3>
+           <p>Você não tem permissão para acessar esta área.</p>
+        </div>
+      )}
+
+      {/* --- USER MANAGEMENT TAB --- */}
+      {isAdmin && activeTab === 'users' && (
+        <div className="max-w-4xl mx-auto space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-200 flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 rounded-full text-indigo-600">
+                        <Users className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900">Gerenciar Usuários</h3>
+                        <p className="text-sm text-slate-500">Cadastre novos usuários para acessar o sistema.</p>
+                    </div>
+                </div>
+
+                <div className="p-8">
+                    <form onSubmit={handleRegisterUser} className="max-w-md mx-auto space-y-5">
+                         {userMsg && (
+                            <div className={`p-3 rounded-lg text-sm border flex items-center gap-2 ${userMsg.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                {userMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
+                                {userMsg.text}
+                            </div>
+                         )}
+
+                         <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
+                            <input
+                              type="text"
+                              required
+                              value={newUserName}
+                              onChange={(e) => setNewUserName(e.target.value)}
+                              className="w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="Ex: João da Silva"
+                            />
+                        </div>
+
+                         <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Login (Usuário)</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <User className="h-5 w-5 text-slate-400" />
+                                </div>
+                                <input
+                                type="text"
+                                required
+                                value={newUserLogin}
+                                onChange={(e) => setNewUserLogin(e.target.value)}
+                                className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="joao.silva"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Lock className="h-5 w-5 text-slate-400" />
+                                </div>
+                                <input
+                                type="password"
+                                required
+                                value={newUserPass}
+                                onChange={(e) => setNewUserPass(e.target.value)}
+                                className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="******"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <label className="flex items-center gap-3 cursor-pointer">
+                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${newUserIsAdmin ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
+                                {newUserIsAdmin && <ShieldCheck className="w-3.5 h-3.5 text-white" />}
+                            </div>
+                            <input 
+                                type="checkbox" 
+                                className="hidden"
+                                checked={newUserIsAdmin}
+                                onChange={(e) => setNewUserIsAdmin(e.target.checked)}
+                            />
+                            <div>
+                                <span className="block text-sm font-medium text-slate-900">Perfil de Administrador</span>
+                                <span className="block text-xs text-slate-500">Acesso total às configurações e áreas restritas.</span>
+                            </div>
+                            </label>
+                        </div>
+
+                        <Button type="submit" className="w-full" disabled={isRegistering}>
+                            {isRegistering ? (
+                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</>
+                            ) : (
+                                <><UserPlus className="w-4 h-4 mr-2" /> Cadastrar Usuário</>
+                            )}
+                        </Button>
+                    </form>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {isAdmin && activeTab === 'testing' && (
          <div className="max-w-4xl mx-auto space-y-6">
            <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
               <div className="flex items-start gap-4 mb-6">
@@ -484,7 +555,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
          </div>
       )}
 
-      {activeTab === 'cloud' && (
+      {isAdmin && activeTab === 'cloud' && (
         <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className={`p-6 rounded-xl border ${isCloudConfigured ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'} shadow-sm`}>
                 <div className="flex items-center gap-3 mb-6">

@@ -40,6 +40,16 @@ export const DEFAULT_TEXTURES = [
 
 export type OrderStatus = 'Pendente' | 'Em Impressão' | 'Acabamento' | 'Concluído' | 'Entregue';
 
+export type UserRole = 'admin' | 'user';
+
+export interface AppUser {
+  id: string;
+  name: string;
+  username: string;
+  password?: string; // Optional in frontend type generally, but used for auth
+  role: UserRole;
+}
+
 export interface Customer {
   id?: string; // Database ID
   name: string;

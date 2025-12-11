@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture } from '../types';
+import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture, AppUser } from '../types';
 
 let supabase: SupabaseClient | undefined;
 
@@ -54,6 +54,57 @@ export const testConnection = async (config: SupabaseConfig): Promise<{ success:
 };
 
 export const getClient = () => supabase;
+
+// --- Auth Management (App Users) ---
+
+export const loginUser = async (username: string, password: string): Promise<{ success: boolean; user?: AppUser; message?: string }> => {
+  if (!supabase) return { success: false, message: "Banco de dados não conectado." };
+
+  try {
+    const { data, error } = await supabase
+      .from('app_users')
+      .select('*')
+      .eq('username', username)
+      .eq('password', password) // Simple check. For production, use Supabase Auth or Hash comparison
+      .single();
+
+    if (error || !data) {
+      return { success: false, message: "Usuário ou senha incorretos." };
+    }
+
+    return { success: true, user: data as AppUser };
+  } catch (e) {
+    return { success: false, message: "Erro ao tentar login." };
+  }
+};
+
+export const registerUser = async (user: Omit<AppUser, 'id'>): Promise<{ success: boolean; message?: string }> => {
+  if (!supabase) return { success: false, message: "Banco de dados não conectado." };
+
+  try {
+    // Check if exists
+    const { data: existing } = await supabase
+      .from('app_users')
+      .select('id')
+      .eq('username', user.username)
+      .single();
+
+    if (existing) {
+      return { success: false, message: "Este usuário já existe." };
+    }
+
+    const { error } = await supabase
+      .from('app_users')
+      .insert([user]);
+
+    if (error) throw error;
+
+    return { success: true, message: "Usuário cadastrado com sucesso!" };
+  } catch (e: any) {
+    return { success: false, message: e.message || "Erro ao cadastrar." };
+  }
+};
+
 
 // --- Colors Management ---
 

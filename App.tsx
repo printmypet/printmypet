@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Database, Beaker } from 'lucide-react';
-import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig, Texture } from './types';
+import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Database, Beaker, LogOut, User } from 'lucide-react';
+import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig, Texture, AppUser } from './types';
 import { OrderForm } from './components/OrderForm';
 import { OrderList } from './components/OrderList';
 import { StatsDashboard } from './components/StatsDashboard';
 import { AdminSettings } from './components/AdminSettings';
-import { AdminLogin } from './components/AdminLogin';
+import { LoginPage } from './components/LoginPage';
 import { Button } from './components/ui/Button';
 import { 
   initSupabase, 
@@ -22,10 +22,12 @@ import {
 } from './services/supabase';
 
 const App: React.FC = () => {
+  // Auth State
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [view, setView] = useState<'list' | 'new' | 'admin' | 'edit'>('list');
   const [isOnline, setIsOnline] = useState(false);
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); 
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [isTestMode, setIsTestMode] = useState(false);
@@ -252,6 +254,16 @@ const App: React.FC = () => {
     setView('edit');
   };
 
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setView('list');
+  };
+
+  // If not logged in, show Login Page
+  if (!currentUser) {
+    return <LoginPage onLogin={setCurrentUser} isOnline={isOnline} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Test Mode Banner */}
@@ -275,14 +287,18 @@ const App: React.FC = () => {
                 </span>
               )}
             </span>
-            <a 
-              href="https://melhorenvio.com.br/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-sky-300 transition-colors font-medium"
-            >
-              Ir para Melhor Envio <ExternalLink className="w-3 h-3" />
-            </a>
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1 text-slate-300">
+                <User className="w-3 h-3" /> {currentUser.name} ({currentUser.role})
+              </span>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-1 hover:text-red-400 transition-colors"
+                title="Sair"
+              >
+                <LogOut className="w-3 h-3" /> Sair
+              </button>
+            </div>
          </div>
       </div>
 
@@ -366,19 +382,16 @@ const App: React.FC = () => {
         )}
 
         {view === 'admin' && (
-          isAdminAuthenticated ? (
-            <AdminSettings 
-              partsColors={partsColors}
-              textures={availableTextures}
-              onUpdatePartsColors={setPartsColors}
-              onUpdateTextures={setAvailableTextures}
-              onConfigUpdate={handleConfigUpdate}
-              onRefreshColors={refreshConfig}
-              isOnline={isOnline}
-            />
-          ) : (
-            <AdminLogin onLogin={() => setIsAdminAuthenticated(true)} />
-          )
+          <AdminSettings 
+            partsColors={partsColors}
+            textures={availableTextures}
+            onUpdatePartsColors={setPartsColors}
+            onUpdateTextures={setAvailableTextures}
+            onConfigUpdate={handleConfigUpdate}
+            onRefreshColors={refreshConfig}
+            isOnline={isOnline}
+            currentUser={currentUser}
+          />
         )}
       </main>
 
