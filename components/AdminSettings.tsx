@@ -183,7 +183,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sql = `
--- 1. Cria a tabela se não existir
+-- 1. Garante Tabela de Clientes
 CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
   state text
 );
 
--- 2. REMOVE A OBRIGATORIEDADE (Essencial)
+-- 2. AJUSTA COLUNAS OBRIGATÓRIAS (Caso tabela já exista)
 ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;
@@ -223,7 +223,7 @@ ALTER TABLE public.customers ALTER COLUMN state DROP NOT NULL;
 ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;
 CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL;
 
--- 4. Cria outras tabelas
+-- 4. Cria Tabelas Auxiliares
 CREATE TABLE IF NOT EXISTS public.colors (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
@@ -238,6 +238,7 @@ CREATE TABLE IF NOT EXISTS public.textures (
   name text NOT NULL UNIQUE
 );
 
+-- 5. Tabela de Pedidos
 CREATE TABLE IF NOT EXISTS public.orders (
   id uuid PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
@@ -246,17 +247,19 @@ CREATE TABLE IF NOT EXISTS public.orders (
   shipping_cost numeric,
   is_paid boolean,
   products jsonb,
-  customer_id uuid REFERENCES public.customers(id),
   customer jsonb
 );
 
--- 5. Segurança
+-- 6. MIGRATION IMPORTANTE: Adiciona a coluna customer_id se ela não existir
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);
+
+-- 7. Configurações de Segurança
 ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
 
--- 6. Configura Realtime de forma segura
+-- 8. Configura Realtime de forma segura
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -271,13 +274,13 @@ BEGIN
 END
 $$;
 
--- 7. Insere texturas padrão
+-- 9. Insere Texturas Padrão
 INSERT INTO public.textures (name) VALUES 
 ('Liso'), ('Hexagonal'), ('Listrado'), ('Pontilhado'), ('Voronoi')
 ON CONFLICT (name) DO NOTHING;
     `;
     navigator.clipboard.writeText(sql.trim());
-    alert("SQL Atualizado copiado para a área de transferência!");
+    alert("SQL Completo copiado! Rode no 'SQL Editor' do Supabase.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = {
@@ -407,23 +410,21 @@ ON CONFLICT (name) DO NOTHING;
                 </div>
                 
                 <p className="text-sm text-slate-400 mb-4">
-                    Copie o SQL abaixo e rode no Supabase para criar as tabelas de Clientes, Cores e Texturas.
+                    Copie o SQL abaixo e rode no Supabase para corrigir tabelas e criar colunas faltantes.
                 </p>
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- SQL Seguro (Rode quantas vezes precisar)
--- 1. Cria tabelas e remove obrigatoriedade
+{`-- Script de Migração Automático
+-- 1. Tabelas Base (Cria se não existir)
 CREATE TABLE IF NOT EXISTS public.customers (...);
+-- 2. Correção de Colunas (Customer)
 ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;
 ...
--- 2. CPF Único (Condicional)
-ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;
-CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL;
+-- 3. Correção de Colunas (Orders)
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);
 ...
--- 3. Realtime Seguro
-DO $$ BEGIN IF NOT EXISTS (...) THEN ALTER PUBLICATION... END IF; END $$;`}
+-- (Clique no botão copiar para pegar o script completo)`}
                     </pre>
                     <button 
                         onClick={copySql}
@@ -435,7 +436,7 @@ DO $$ BEGIN IF NOT EXISTS (...) THEN ALTER PUBLICATION... END IF; END $$;`}
                 </div>
                 
                 <div className="mt-4 text-xs text-slate-500">
-                   * Se você receber erros ao inserir pedidos vazios, execute o SQL acima.
+                   * Este script é seguro para rodar várias vezes.
                 </div>
             </div>
         </div>
