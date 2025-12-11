@@ -13,6 +13,7 @@ import {
   initSupabase, 
   subscribeToOrders, 
   addOrderToSupabase, 
+  updateOrderInSupabase,
   updateOrderStatusInSupabase, 
   updateOrderPaidInSupabase, 
   deleteOrderFromSupabase,
@@ -22,10 +23,11 @@ import {
 
 const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [view, setView] = useState<'list' | 'new' | 'admin'>('list');
+  const [view, setView] = useState<'list' | 'new' | 'admin' | 'edit'>('list');
   const [isOnline, setIsOnline] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0); // Key to trigger re-init
+  const [reloadKey, setReloadKey] = useState(0); 
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
   // Config State
   const [partsColors, setPartsColors] = useState<PartsColors>(() => {
@@ -45,7 +47,6 @@ const App: React.FC = () => {
     if (saved) {
       return JSON.parse(saved);
     }
-    // Migration from old string[] format to Texture[] format
     const oldSaved = localStorage.getItem('app-textures');
     if (oldSaved) {
       try {
@@ -159,7 +160,6 @@ const App: React.FC = () => {
     setReloadKey(prev => prev + 1);
   };
 
-  // Function to refresh config specifically (called after admin edits)
   const refreshConfig = async () => {
     if (isOnline) {
        const dbColors = await fetchColorsFromSupabase();
@@ -170,25 +170,49 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveOrder = async (newOrderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
-    const newOrder: Order = {
-      ...newOrderData,
-      id: uuidv4(),
-      createdAt: new Date().toISOString(),
-      status: 'Pendente'
-    };
+  const handleSaveOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
+    if (editingOrder) {
+      // UPDATE Logic
+      const updatedOrder: Order = {
+        ...editingOrder,
+        ...orderData,
+        // Preserve original sensitive fields unless specifically needed to change
+        // customer.id is handled in upsert logic inside the form/service
+      };
 
-    if (isOnline) {
-      try {
-        await addOrderToSupabase(newOrder);
-      } catch (e: any) {
-        // Show specific error message
-        alert(`Erro ao salvar no Supabase: ${e.message || JSON.stringify(e)}`);
-        return;
+      if (isOnline) {
+        try {
+          await updateOrderInSupabase(updatedOrder);
+        } catch (e: any) {
+          alert(`Erro ao atualizar: ${e.message}`);
+          return;
+        }
+      } else {
+        setOrders(prev => prev.map(o => o.id === editingOrder.id ? updatedOrder : o));
       }
+
     } else {
-      setOrders(prev => [newOrder, ...prev]);
+      // CREATE Logic
+      const newOrder: Order = {
+        ...orderData,
+        id: uuidv4(),
+        createdAt: new Date().toISOString(),
+        status: 'Pendente'
+      };
+
+      if (isOnline) {
+        try {
+          await addOrderToSupabase(newOrder);
+        } catch (e: any) {
+          alert(`Erro ao salvar no Supabase: ${e.message}`);
+          return;
+        }
+      } else {
+        setOrders(prev => [newOrder, ...prev]);
+      }
     }
+    
+    setEditingOrder(null);
     setView('list');
   };
 
@@ -214,6 +238,11 @@ const App: React.FC = () => {
     } else {
       setOrders(prev => prev.map(o => o.id === id ? { ...o, isPaid } : o));
     }
+  };
+
+  const handleEditClick = (order: Order) => {
+    setEditingOrder(order);
+    setView('edit');
   };
 
   return (
@@ -247,7 +276,7 @@ const App: React.FC = () => {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center cursor-pointer select-none font-logo" onClick={() => setView('list')}>
+            <div className="flex items-center cursor-pointer select-none font-logo" onClick={() => { setView('list'); setEditingOrder(null); }}>
               <span className="text-2xl font-bold tracking-tight text-slate-900">PrintMy</span>
               <span className="text-2xl font-bold tracking-tight text-sky-400">[PET]</span>
               <span className="text-2xl font-bold tracking-tight text-slate-900">3D</span>
@@ -256,23 +285,23 @@ const App: React.FC = () => {
             <nav className="flex gap-2">
               <Button 
                 variant={view === 'list' ? 'secondary' : 'outline'} 
-                onClick={() => setView('list')}
+                onClick={() => { setView('list'); setEditingOrder(null); }}
                 className={view === 'list' ? 'bg-slate-100' : ''}
               >
                 <LayoutDashboard className="w-4 h-4 mr-2" />
                 <span className="hidden sm:inline">Painel</span>
               </Button>
               <Button 
-                variant={view === 'new' ? 'primary' : 'outline'} 
-                onClick={() => setView('new')}
-                className={view === 'new' ? 'ring-2 ring-indigo-200' : ''}
+                variant={(view === 'new' || view === 'edit') ? 'primary' : 'outline'} 
+                onClick={() => { setView('new'); setEditingOrder(null); }}
+                className={(view === 'new' || view === 'edit') ? 'ring-2 ring-indigo-200' : ''}
               >
                 <PlusCircle className="w-4 h-4 mr-2" />
                 <span className="hidden sm:inline">Novo Pedido</span>
               </Button>
               <Button 
                 variant={view === 'admin' ? 'secondary' : 'outline'} 
-                onClick={() => setView('admin')}
+                onClick={() => { setView('admin'); setEditingOrder(null); }}
                 className={view === 'admin' ? 'bg-slate-100' : ''}
                 title="Configurações e Login"
               >
@@ -286,17 +315,24 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {view === 'new' && (
+        {(view === 'new' || view === 'edit') && (
           <div className="animate-fade-in-up">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-slate-900">Novo Pedido de Impressão</h2>
-              <p className="text-slate-500">Adicione um ou mais produtos ao pedido e preencha os dados do cliente.</p>
+              <h2 className="text-2xl font-bold text-slate-900">
+                {view === 'edit' ? 'Editar Pedido' : 'Novo Pedido de Impressão'}
+              </h2>
+              <p className="text-slate-500">
+                {view === 'edit' 
+                  ? 'Atualize as informações dos produtos ou do cliente.' 
+                  : 'Adicione um ou mais produtos ao pedido e preencha os dados do cliente.'}
+              </p>
             </div>
             <OrderForm 
+              key={view === 'edit' ? editingOrder?.id : 'new'}
+              initialOrder={view === 'edit' ? editingOrder : null}
               onSave={handleSaveOrder} 
-              onCancel={() => setView('list')} 
+              onCancel={() => { setView('list'); setEditingOrder(null); }} 
               partsColors={partsColors}
-              // Map Texture objects to simple strings for the OrderForm dropdown
               availableTextures={availableTextures.map(t => t.name)}
             />
           </div>
@@ -309,7 +345,8 @@ const App: React.FC = () => {
                 orders={orders} 
                 onUpdateStatus={handleUpdateStatus} 
                 onUpdatePaid={handleUpdatePaid}
-                onDelete={handleDeleteOrder} 
+                onDelete={handleDeleteOrder}
+                onEdit={handleEditClick}
              />
           </div>
         )}

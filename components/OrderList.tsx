@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck } from 'lucide-react';
 import { Order, OrderStatus } from '../types';
@@ -8,6 +9,7 @@ interface OrderListProps {
   onUpdateStatus: (id: string, status: OrderStatus) => void;
   onUpdatePaid: (id: string, isPaid: boolean) => void;
   onDelete: (id: string) => void;
+  onEdit: (order: Order) => void;
 }
 
 const statusColors: Record<OrderStatus, string> = {
@@ -20,7 +22,7 @@ const statusColors: Record<OrderStatus, string> = {
 
 type FilterType = 'open' | 'completed' | 'all';
 
-export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, onUpdatePaid, onDelete }) => {
+export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, onUpdatePaid, onDelete, onEdit }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('open');
   const [showOnlyPaid, setShowOnlyPaid] = useState(false);
@@ -178,10 +180,13 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                   </div>
                   
                   <div className="flex items-center gap-2">
+                     <Button variant="secondary" size="sm" onClick={() => onEdit(order)} className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100">
+                        <Edit2 className="w-4 h-4 mr-1" /> Editar
+                     </Button>
                      <select 
                       value={order.status}
                       onChange={(e) => onUpdateStatus(order.id, e.target.value as OrderStatus)}
-                      className="text-sm border-slate-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 cursor-pointer"
+                      className="text-sm border-slate-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 cursor-pointer h-9"
                      >
                        <option value="Pendente">Pendente</option>
                        <option value="Em Impressão">Em Impressão</option>

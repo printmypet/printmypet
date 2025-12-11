@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2, Users, Truck, Loader2, Search } from 'lucide-react';
 import { 
@@ -17,18 +17,20 @@ interface OrderFormProps {
   availableTextures: string[];
   onSave: (order: Omit<Order, 'id' | 'createdAt' | 'status'>) => void;
   onCancel: () => void;
+  initialOrder?: Order | null;
 }
 
 export const OrderForm: React.FC<OrderFormProps> = ({ 
   partsColors, 
   availableTextures, 
   onSave, 
-  onCancel 
+  onCancel,
+  initialOrder
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
   
   // List of added products for the order
-  const [cartItems, setCartItems] = useState<ProductConfig[]>([]);
+  const [cartItems, setCartItems] = useState<ProductConfig[]>(initialOrder?.products || []);
 
   // Current product being configured
   const [currentProduct, setCurrentProduct] = useState<ProductConfig>({
@@ -46,14 +48,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const [showDogNameInput, setShowDogNameInput] = useState(false);
   const [isSearchingCpf, setIsSearchingCpf] = useState(false);
 
-  // Price handling - Separated into Products and Shipping
-  const [productsPriceRaw, setProductsPriceRaw] = useState<number>(0); // Stores cents
-  const [productsPriceDisplay, setProductsPriceDisplay] = useState<string>(''); // Stores formatted string
+  // Price handling
+  const [productsPriceRaw, setProductsPriceRaw] = useState<number>(0); 
+  const [productsPriceDisplay, setProductsPriceDisplay] = useState<string>(''); 
   
-  const [shippingPriceRaw, setShippingPriceRaw] = useState<number>(0); // Stores cents
-  const [shippingPriceDisplay, setShippingPriceDisplay] = useState<string>(''); // Stores formatted string
+  const [shippingPriceRaw, setShippingPriceRaw] = useState<number>(0); 
+  const [shippingPriceDisplay, setShippingPriceDisplay] = useState<string>(''); 
 
-  const [isPaid, setIsPaid] = useState<boolean>(false);
+  const [isPaid, setIsPaid] = useState<boolean>(initialOrder?.isPaid || false);
 
   // Customer State
   const [customer, setCustomer] = useState<Omit<Customer, 'address'>>({
@@ -73,6 +75,51 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     state: ''
   });
 
+  // Load initial data if editing
+  useEffect(() => {
+    if (initialOrder) {
+      // 1. Products already set in useState init
+      
+      // 2. Customer
+      setCustomer({
+        id: initialOrder.customer.id,
+        name: initialOrder.customer.name,
+        type: initialOrder.customer.type || 'final',
+        partnerName: initialOrder.customer.partnerName || '',
+        email: initialOrder.customer.email || '',
+        phone: initialOrder.customer.phone || '',
+        cpf: initialOrder.customer.cpf || '',
+        instagram: initialOrder.customer.instagram || '',
+        zipCode: initialOrder.customer.zipCode || '',
+        street: initialOrder.customer.street || '',
+        number: initialOrder.customer.number || '',
+        complement: initialOrder.customer.complement || '',
+        neighborhood: initialOrder.customer.neighborhood || '',
+        city: initialOrder.customer.city || '',
+        state: initialOrder.customer.state || ''
+      });
+
+      // 3. Finance
+      const total = initialOrder.price || 0;
+      const shipping = initialOrder.shippingCost || 0;
+      const products = Math.max(0, total - shipping);
+
+      // Set Raw (in cents if your logic uses cents, or standard float)
+      // The state logic uses cents (int), assuming input logic multiplies by 100 for display? 
+      // Let's align: currently inputs parse int/100. So we store CENTS.
+      const shippingCents = Math.round(shipping * 100);
+      const productsCents = Math.round(products * 100);
+
+      setShippingPriceRaw(shippingCents);
+      setProductsPriceRaw(productsCents);
+      
+      setShippingPriceDisplay(shipping.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+      setProductsPriceDisplay(products.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+      
+      setIsPaid(initialOrder.isPaid);
+    }
+  }, [initialOrder]);
+
   // --- Handlers ---
 
   const handleProductChange = (key: keyof ProductConfig, value: string) => {
@@ -82,8 +129,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const handleAddToCart = () => {
     setCartItems(prev => [...prev, currentProduct]);
     
-    // Reset form for next item but keep some defaults logic if needed, 
-    // or just reset to initial state with new ID
+    // Reset form for next item
     setCurrentProduct({
         id: uuidv4(),
         part1Color: partsColors.base[0]?.hex || '#000000',
@@ -108,59 +154,44 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   // Phone Mask
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
-    
-    // Limit length
+    let value = e.target.value.replace(/\D/g, ''); 
     if (value.length > 11) value = value.slice(0, 11);
-
-    // Apply mask (00) 00000-0000
     if (value.length > 2) {
       value = `(${value.slice(0, 2)}) ${value.slice(2)}`;
     }
     if (value.length > 9) {
       value = `${value.slice(0, 9)}-${value.slice(9)}`;
-    } // (11) 99999-9999 is 15 chars
-
+    } 
     setCustomer(prev => ({ ...prev, phone: value }));
   };
 
   // CEP Mask (00.000-000)
   const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
-    
-    if (value.length > 8) value = value.slice(0, 8); // Max 8 digits
-
-    // Apply mask 00.000-000
+    let value = e.target.value.replace(/\D/g, ''); 
+    if (value.length > 8) value = value.slice(0, 8); 
     value = value.replace(/^(\d{2})(\d)/, '$1.$2');
     value = value.replace(/\.(\d{3})(\d)/, '.$1-$2');
-
     setCustomer(prev => ({ ...prev, zipCode: value }));
   };
 
   // CPF Mask and Auto-Fetch
   const handleCpfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
-    
+    let value = e.target.value.replace(/\D/g, '');
     if (value.length > 11) value = value.slice(0, 11);
-
-    // Apply mask 000.000.000-00
     value = value.replace(/(\d{3})(\d)/, '$1.$2');
     value = value.replace(/(\d{3})(\d)/, '$1.$2');
     value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
 
     setCustomer(prev => ({ ...prev, cpf: value }));
 
-    // Trigger search if full CPF
-    if (value.length === 14) {
+    if (value.length === 14 && !initialOrder) { // Only fetch on new orders to avoid overwriting edits
       setIsSearchingCpf(true);
       try {
         const foundCustomer = await fetchCustomerByCpf(value);
         if (foundCustomer) {
-          // Fill fields with found data
           setCustomer(prev => ({
             ...prev,
             ...foundCustomer,
-            // Keep the entered CPF to be safe
             cpf: value 
           }));
         }
@@ -174,7 +205,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   // Currency Handlers
   const handleProductsPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, ''); // Get only numbers
+    const value = e.target.value.replace(/\D/g, ''); 
     const cents = parseInt(value, 10) || 0;
     setProductsPriceRaw(cents);
 
@@ -186,7 +217,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   };
 
   const handleShippingPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, ''); // Get only numbers
+    const value = e.target.value.replace(/\D/g, '');
     const cents = parseInt(value, 10) || 0;
     setShippingPriceRaw(cents);
 
@@ -205,7 +236,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Construct full address string cleanly, avoiding ", ," or empty separators
+    // Construct full address string cleanly
     const addressParts = [
       customer.street ? `${customer.street}` : '',
       customer.number ? `${customer.number}` : '',
@@ -216,20 +247,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       customer.zipCode ? `(${customer.zipCode})` : ''
     ];
     
-    // Join valid parts and clean up
     const fullAddress = addressParts
       .filter(part => part.trim() !== '' && part.trim() !== '-')
       .join(', ')
-      .replace(/, -/g, ' -'); // Fix any "Street, - Neighborhood" issues
+      .replace(/, -/g, ' -'); 
 
     onSave({ 
       customer: {
         ...customer,
         address: fullAddress || 'Endereço não informado'
       },
-      products: cartItems, // Send the list of products
-      price: totalRaw / 100, // Total Value
-      shippingCost: shippingPriceRaw / 100, // Shipping Component
+      products: cartItems, 
+      price: totalRaw / 100, 
+      shippingCost: shippingPriceRaw / 100, 
       isPaid
     });
   };
@@ -255,10 +285,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     </div>
   );
 
-  // Helper to get SVG Pattern based on texture name
+  // Helper to get SVG Pattern
   const getTexturePattern = (textureName: string) => {
     const name = textureName.toLowerCase();
-    const color = "rgba(0,0,0,0.4)"; // Dark overlay color
+    const color = "rgba(0,0,0,0.4)"; 
 
     if (name.includes('hexagonal')) {
       return (
@@ -298,7 +328,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       );
     }
     else {
-      // Default / Paws for Custom or Unknown
       return (
         <defs>
           <pattern id="paws" width="30" height="30" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -892,7 +921,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             className={cartItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
           >
             <Save className="w-4 h-4 mr-2" />
-            {cartItems.length === 0 ? 'Adicione itens para Salvar' : `Salvar Pedido (${cartItems.length} itens)`}
+            {initialOrder ? 'Atualizar Pedido' : cartItems.length === 0 ? 'Adicione itens para Salvar' : `Salvar Pedido (${cartItems.length} itens)`}
           </Button>
         )}
       </div>
