@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical } from 'lucide-react';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, RefreshCw } from 'lucide-react';
 import { PartsColors, SupabaseConfig, Texture, ColorOption } from '../types';
 import { Button } from './ui/Button';
 import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions } from '../services/supabase';
@@ -25,7 +25,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   onRefreshColors,
   isOnline
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'cloud'>(() => {
+  const [activeTab, setActiveTab] = useState<'products' | 'cloud' | 'testing'>(() => {
     return localStorage.getItem('app-supabase-config') ? 'products' : 'cloud';
   });
   
@@ -39,100 +39,133 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   // Drag and Drop State
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
 
+  // Prod Config
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>({
     supabaseUrl: '',
     supabaseKey: ''
   });
+
+  // Test Config
+  const [testConfig, setTestConfig] = useState<SupabaseConfig>({
+    supabaseUrl: '',
+    supabaseKey: ''
+  });
+
   const [isCloudConfigured, setIsCloudConfigured] = useState(false);
+  const [currentEnv, setCurrentEnv] = useState<'prod' | 'test'>('prod');
+  
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{success: boolean; message?: string} | null>(null);
 
   useEffect(() => {
+    // Load Prod Config
     const savedConfig = localStorage.getItem('app-supabase-config');
     if (savedConfig) {
       setSupabaseConfig(JSON.parse(savedConfig));
       setIsCloudConfigured(true);
     }
+
+    // Load Test Config
+    const savedTestConfig = localStorage.getItem('app-supabase-config-test');
+    if (savedTestConfig) {
+      setTestConfig(JSON.parse(savedTestConfig));
+    }
+
+    // Load Current Env
+    const env = localStorage.getItem('app-env-mode') as 'prod' | 'test';
+    if (env) setCurrentEnv(env);
   }, []);
 
-  const handleSaveCloudConfig = async (e: React.FormEvent) => {
+  const handleSaveCloudConfig = async (e: React.FormEvent, type: 'prod' | 'test') => {
     e.preventDefault();
     setIsTesting(true);
     setTestResult(null);
 
-    if (!supabaseConfig.supabaseUrl || !supabaseConfig.supabaseKey) {
+    const configToTest = type === 'prod' ? supabaseConfig : testConfig;
+
+    if (!configToTest.supabaseUrl || !configToTest.supabaseKey) {
        setIsTesting(false);
        setTestResult({ success: false, message: 'Preencha ambos os campos.' });
        return;
     }
 
-    const result = await testConnection(supabaseConfig);
+    const result = await testConnection(configToTest);
     
     setIsTesting(false);
     setTestResult(result);
 
     if (result.success) {
       const cleanConfig = {
-        supabaseUrl: supabaseConfig.supabaseUrl.trim(),
-        supabaseKey: supabaseConfig.supabaseKey.trim()
+        supabaseUrl: configToTest.supabaseUrl.trim(),
+        supabaseKey: configToTest.supabaseKey.trim()
       };
-      localStorage.setItem('app-supabase-config', JSON.stringify(cleanConfig));
-      setIsCloudConfigured(true);
-      onConfigUpdate();
+      
+      if (type === 'prod') {
+        localStorage.setItem('app-supabase-config', JSON.stringify(cleanConfig));
+        setIsCloudConfigured(true);
+      } else {
+        localStorage.setItem('app-supabase-config-test', JSON.stringify(cleanConfig));
+        alert("Configuração de testes salva com sucesso!");
+      }
+      
+      // If we are currently in the environment we just updated, refresh
+      if (currentEnv === type) {
+        onConfigUpdate();
+      }
+    }
+  };
+
+  const handleSwitchEnv = (targetEnv: 'prod' | 'test') => {
+    if (targetEnv === 'test') {
+       const hasTestConfig = localStorage.getItem('app-supabase-config-test');
+       if (!hasTestConfig) {
+         alert("Configure primeiro o banco de dados de testes na aba 'Área de Testes'.");
+         return;
+       }
+    }
+    
+    if (confirm(`Deseja mudar para o ambiente de ${targetEnv === 'prod' ? 'PRODUÇÃO' : 'TESTES'}? A página será recarregada.`)) {
+      localStorage.setItem('app-env-mode', targetEnv);
+      window.location.reload();
     }
   };
 
   const handleClearCloudConfig = () => {
     if (confirm('Isso desconectará o app da nuvem. Os pedidos voltarão a ser salvos apenas neste dispositivo. Continuar?')) {
       localStorage.removeItem('app-supabase-config');
+      localStorage.removeItem('app-supabase-config-test');
+      localStorage.removeItem('app-env-mode');
       setIsCloudConfigured(false);
-      setSupabaseConfig({
-        supabaseUrl: '',
-        supabaseKey: ''
-      });
+      setSupabaseConfig({ supabaseUrl: '', supabaseKey: '' });
+      setTestConfig({ supabaseUrl: '', supabaseKey: '' });
       onConfigUpdate();
     }
   };
 
-  // --- Drag and Drop Handlers ---
+  // --- Drag and Drop Handlers (Keep existing logic) ---
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     setDraggedItemIndex(index);
     e.dataTransfer.effectAllowed = 'move';
-    // Firefox requires data to be set
     e.dataTransfer.setData('text/plain', index.toString());
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); // Necessary to allow dropping
+    e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
     e.preventDefault();
     if (draggedItemIndex === null || draggedItemIndex === dropIndex) return;
-
     const newList = [...partsColors[activePart]];
     const [movedItem] = newList.splice(draggedItemIndex, 1);
     newList.splice(dropIndex, 0, movedItem);
-
-    // Update Local State Immediately
-    onUpdatePartsColors({
-      ...partsColors,
-      [activePart]: newList
-    });
-
+    onUpdatePartsColors({ ...partsColors, [activePart]: newList });
     setDraggedItemIndex(null);
-
-    // If Online, Update Positions in DB
     if (isOnline) {
-       try {
-         await updateColorPositions(newList);
-       } catch (err) {
-         console.error("Failed to update positions in DB", err);
-       }
+       try { await updateColorPositions(newList); } catch (err) { console.error("Failed to update positions in DB", err); }
     }
   };
-
 
   const handleAddColor = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,18 +176,13 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
           await addColorToSupabase(activePart, newColorName, newColorHex);
           if (onRefreshColors) await onRefreshColors();
         } else {
-          // Fallback Offline
           const updatedList = [...partsColors[activePart], { name: newColorName, hex: newColorHex }];
-          onUpdatePartsColors({
-            ...partsColors,
-            [activePart]: updatedList
-          });
+          onUpdatePartsColors({ ...partsColors, [activePart]: updatedList });
         }
         setNewColorName('');
         setNewColorHex('#000000');
       } catch (e) {
-        alert("Erro ao adicionar cor. Verifique o console.");
-        console.error(e);
+        alert("Erro ao adicionar cor.");
       } finally {
         setIsProcessingColor(false);
       }
@@ -169,15 +197,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
            if (onRefreshColors) await onRefreshColors();
         } else {
            const updatedList = partsColors[activePart].filter(c => c.hex !== color.hex);
-           onUpdatePartsColors({
-             ...partsColors,
-             [activePart]: updatedList
-           });
+           onUpdatePartsColors({ ...partsColors, [activePart]: updatedList });
         }
-      } catch (e) {
-        alert("Erro ao remover cor.");
-        console.error(e);
-      }
+      } catch (e) { alert("Erro ao remover cor."); }
     }
   };
 
@@ -185,27 +207,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     e.preventDefault();
     if (newTextureName) {
       const exists = textures.some(t => t.name.toLowerCase() === newTextureName.toLowerCase());
-      if (exists) {
-        alert('Esta textura já existe!');
-        return;
-      }
-
+      if (exists) { alert('Esta textura já existe!'); return; }
       setIsProcessingTexture(true);
       try {
         if (isOnline) {
           await addTextureToSupabase(newTextureName);
           if (onRefreshColors) await onRefreshColors();
         } else {
-          // Fallback Offline
           onUpdateTextures([...textures, { id: uuidv4(), name: newTextureName }]);
         }
         setNewTextureName('');
-      } catch (e) {
-         alert("Erro ao adicionar textura.");
-         console.error(e);
-      } finally {
-        setIsProcessingTexture(false);
-      }
+      } catch (e) { alert("Erro ao adicionar textura."); } finally { setIsProcessingTexture(false); }
     }
   };
 
@@ -218,9 +230,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         } else {
            onUpdateTextures(textures.filter(t => t.name !== texture.name));
         }
-      } catch (e) {
-         alert("Erro ao remover textura.");
-      }
+      } catch (e) { alert("Erro ao remover textura."); }
     }
   };
 
@@ -336,20 +346,11 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     ];
     
     navigator.clipboard.writeText(sqlParts.join('\n'));
-    alert("SQL Corrigido (v8 - Ordering Support) copiado! Tente rodar agora.");
+    alert("SQL (v8) copiado! Rode no Supabase de Produção ou de Testes.");
   };
 
-  const partLabels: Record<keyof PartsColors, string> = {
-    base: 'Base',
-    ball: 'Bola',
-    top: 'Tampa/Topo'
-  };
-
-  const partIcons: Record<keyof PartsColors, React.ReactNode> = {
-    base: <Box className="w-4 h-4" />,
-    ball: <Circle className="w-4 h-4" />,
-    top: <Triangle className="w-4 h-4" />
-  };
+  const partLabels: Record<keyof PartsColors, string> = { base: 'Base', ball: 'Bola', top: 'Tampa/Topo' };
+  const partIcons: Record<keyof PartsColors, React.ReactNode> = { base: <Box className="w-4 h-4" />, ball: <Circle className="w-4 h-4" />, top: <Triangle className="w-4 h-4" /> };
 
   return (
     <div className="space-y-8 animate-fade-in-up">
@@ -359,23 +360,129 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
             <Settings className="w-6 h-6 text-slate-600" />
             Configurações do Sistema
             </h2>
-            <p className="text-slate-500 mt-1">Gerencie produtos e conexões.</p>
+            <p className="text-slate-500 mt-1">
+              Ambiente atual: <span className={`font-bold ${currentEnv === 'test' ? 'text-orange-600' : 'text-emerald-600'}`}>
+                {currentEnv === 'test' ? 'TESTES (Sandbox)' : 'PRODUÇÃO'}
+              </span>
+            </p>
         </div>
-        <div className="flex bg-slate-100 p-1 rounded-lg">
+        <div className="flex flex-wrap gap-2 bg-slate-100 p-1 rounded-lg">
             <button
                 onClick={() => setActiveTab('products')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'products' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'products' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
             >
-                Produtos e Cores
+                Produtos
             </button>
              <button
                 onClick={() => setActiveTab('cloud')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'cloud' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'cloud' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
             >
-                Nuvem (Supabase)
+                Nuvem (Prod)
+            </button>
+            <button
+                onClick={() => setActiveTab('testing')}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'testing' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500'}`}
+            >
+                Área de Testes
             </button>
         </div>
       </div>
+
+      {activeTab === 'testing' && (
+         <div className="max-w-4xl mx-auto space-y-6">
+           <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
+              <div className="flex items-start gap-4 mb-6">
+                 <div className="p-3 bg-orange-100 rounded-full text-orange-600">
+                    <Beaker className="w-6 h-6" />
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-bold text-orange-900">Configuração do Ambiente de Testes</h3>
+                    <p className="text-sm text-orange-700 mt-1">
+                       Configure um projeto secundário do Supabase para testar novas funcionalidades sem afetar os dados reais.
+                    </p>
+                 </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-6">
+                 <form onSubmit={(e) => handleSaveCloudConfig(e, 'test')} className="space-y-4 flex-1">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Project URL (Testes)</label>
+                        <input 
+                            type="text" 
+                            value={testConfig.supabaseUrl}
+                            onChange={(e) => setTestConfig({...testConfig, supabaseUrl: e.target.value})}
+                            className="w-full rounded-md border-orange-200 shadow-sm p-2 border focus:ring-orange-500 focus:border-orange-500"
+                            placeholder="https://test-project.supabase.co"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">API Key (Testes)</label>
+                        <input 
+                            type="password" 
+                            value={testConfig.supabaseKey}
+                            onChange={(e) => setTestConfig({...testConfig, supabaseKey: e.target.value})}
+                            className="w-full rounded-md border-orange-200 shadow-sm p-2 border focus:ring-orange-500 focus:border-orange-500"
+                            placeholder="Key do projeto de testes..."
+                        />
+                    </div>
+                    <Button type="submit" disabled={isTesting} className="bg-orange-600 hover:bg-orange-700 text-white w-full">
+                         {isTesting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                         Salvar Configuração de Testes
+                    </Button>
+                 </form>
+
+                 <div className="flex-1 bg-white p-4 rounded-lg border border-orange-100 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h4 className="font-semibold text-slate-800 mb-2">Alternar Ambiente</h4>
+                      <p className="text-sm text-slate-500 mb-4">
+                        O ambiente atual é: <strong>{currentEnv === 'prod' ? 'PRODUÇÃO' : 'TESTES'}</strong>.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <button 
+                        onClick={() => handleSwitchEnv('test')}
+                        disabled={currentEnv === 'test'}
+                        className={`w-full p-3 rounded-lg border text-left flex items-center gap-3 transition-colors ${currentEnv === 'test' ? 'bg-orange-100 border-orange-300 text-orange-800 opacity-50 cursor-default' : 'bg-white hover:bg-orange-50 border-slate-200 text-slate-700'}`}
+                      >
+                         <div className={`w-4 h-4 rounded-full border ${currentEnv === 'test' ? 'bg-orange-500 border-orange-600' : 'bg-white border-slate-300'}`}></div>
+                         <div className="flex-1">
+                           <span className="block font-medium">Ambiente de Testes</span>
+                           <span className="text-xs text-slate-400">Dados fictícios e experimentos</span>
+                         </div>
+                      </button>
+
+                      <button 
+                         onClick={() => handleSwitchEnv('prod')}
+                         disabled={currentEnv === 'prod'}
+                         className={`w-full p-3 rounded-lg border text-left flex items-center gap-3 transition-colors ${currentEnv === 'prod' ? 'bg-emerald-100 border-emerald-300 text-emerald-800 opacity-50 cursor-default' : 'bg-white hover:bg-emerald-50 border-slate-200 text-slate-700'}`}
+                      >
+                         <div className={`w-4 h-4 rounded-full border ${currentEnv === 'prod' ? 'bg-emerald-500 border-emerald-600' : 'bg-white border-slate-300'}`}></div>
+                         <div className="flex-1">
+                           <span className="block font-medium">Ambiente de Produção</span>
+                           <span className="text-xs text-slate-400">Dados reais dos clientes</span>
+                         </div>
+                      </button>
+                    </div>
+                 </div>
+              </div>
+
+               {/* SQL Helper for Tests */}
+               <div className="bg-slate-800 text-slate-200 p-6 rounded-xl shadow-sm flex flex-col mt-6">
+                  <div className="flex items-center gap-2 mb-4 text-orange-400">
+                      <Database className="w-5 h-5" />
+                      <h3 className="font-bold">Setup do Banco de Testes</h3>
+                  </div>
+                  <p className="text-sm text-slate-400 mb-4">
+                      Crie um projeto novo no Supabase e rode o mesmo SQL de produção para garantir que o ambiente de testes seja idêntico.
+                  </p>
+                  <Button variant="secondary" onClick={copySql} className="self-start text-xs">
+                    <Copy className="w-3 h-3 mr-2" /> Copiar SQL de Setup
+                  </Button>
+              </div>
+           </div>
+         </div>
+      )}
 
       {activeTab === 'cloud' && (
         <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -392,17 +499,15 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     )}
                     <div>
                         <h3 className="text-lg font-bold text-slate-900">
-                            {isCloudConfigured ? 'Conectado ao Supabase' : 'Configurar Conexão Supabase'}
+                            {isCloudConfigured ? 'Conectado (Produção)' : 'Conexão de Produção'}
                         </h3>
                         <p className="text-sm text-slate-500">
-                            {isCloudConfigured 
-                                ? 'Seus pedidos estão sendo sincronizados com a nuvem.' 
-                                : 'Conecte-se para sincronizar pedidos em tempo real.'}
+                            Configuração oficial onde os pedidos reais são salvos.
                         </p>
                     </div>
                 </div>
 
-                <form onSubmit={handleSaveCloudConfig} className="space-y-4">
+                <form onSubmit={(e) => handleSaveCloudConfig(e, 'prod')} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Project URL</label>
                         <input 
@@ -439,7 +544,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     <div className="pt-4 border-t border-emerald-100/50 flex justify-end gap-3">
                          {isCloudConfigured && (
                             <Button type="button" variant="danger" onClick={handleClearCloudConfig}>
-                                Desconectar
+                                Resetar Tudo
                             </Button>
                          )}
                          <Button type="submit" disabled={isTesting}>
@@ -451,7 +556,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                             ) : (
                               <>
                                 <Save className="w-4 h-4 mr-2" />
-                                {isCloudConfigured ? 'Atualizar Configuração' : 'Salvar e Conectar'}
+                                Salvar Produção
                               </>
                             )}
                          </Button>
@@ -466,7 +571,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                 </div>
                 
                 <p className="text-sm text-slate-400 mb-4">
-                    Copie o SQL abaixo e rode no Supabase para criar a coluna de posição.
+                    Copie o SQL abaixo e rode no Supabase para criar ou atualizar as tabelas.
                 </p>
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">

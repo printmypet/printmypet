@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Database } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Database, Beaker } from 'lucide-react';
 import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig, Texture } from './types';
 import { OrderForm } from './components/OrderForm';
 import { OrderList } from './components/OrderList';
@@ -28,6 +28,7 @@ const App: React.FC = () => {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); 
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [isTestMode, setIsTestMode] = useState(false);
 
   // Config State
   const [partsColors, setPartsColors] = useState<PartsColors>(() => {
@@ -61,7 +62,12 @@ const App: React.FC = () => {
 
   // Init Supabase and Load Data
   useEffect(() => {
-    const localConfigStr = localStorage.getItem('app-supabase-config');
+    // 1. Determine Environment
+    const envMode = localStorage.getItem('app-env-mode') || 'prod';
+    setIsTestMode(envMode === 'test');
+
+    const configKey = envMode === 'test' ? 'app-supabase-config-test' : 'app-supabase-config';
+    const localConfigStr = localStorage.getItem(configKey);
     
     // Check for Environment Variables (Vercel / .env)
     const envConfig: SupabaseConfig = {
@@ -79,7 +85,8 @@ const App: React.FC = () => {
       } catch (e) {
         console.error("Invalid local config", e);
       }
-    } else if (envConfig.supabaseUrl && envConfig.supabaseKey) {
+    } else if (envMode === 'prod' && envConfig.supabaseUrl && envConfig.supabaseKey) {
+      // Only fallback to .env for production
       configToUse = envConfig;
     }
 
@@ -247,13 +254,20 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
+      {/* Test Mode Banner */}
+      {isTestMode && (
+        <div className="bg-orange-600 text-white text-xs font-bold py-1 px-2 text-center flex items-center justify-center gap-2">
+           <Beaker className="w-4 h-4" /> AMBIENTE DE TESTES ATIVO - Dados não serão salvos na produção
+        </div>
+      )}
+
       {/* Top Bar */}
       <div className="bg-slate-900 text-white text-xs py-1.5 px-4">
          <div className="max-w-7xl mx-auto flex justify-between items-center">
             <span className="flex items-center gap-2">
               {isOnline ? (
-                <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                  <Database className="w-3 h-3" /> Online (Supabase)
+                <span className={`flex items-center gap-1 font-bold ${isTestMode ? 'text-orange-400' : 'text-emerald-400'}`}>
+                  <Database className="w-3 h-3" /> Online ({isTestMode ? 'Teste' : 'Prod'})
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-slate-400">
