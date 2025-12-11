@@ -75,7 +75,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isOnline }) => {
                  <strong className="block mb-1">Modo Offline (Sem Banco de Dados)</strong>
                  O sistema não encontrou a configuração do Supabase. Isso é comum em abas anônimas.
                  <br/><br/>
-                 Para configurar, entre como <strong>admin</strong> (senha: <strong>passroot</strong>) e vá em Admin > Nuvem.
+                 Para configurar, entre como <strong>admin</strong> (senha: <strong>passroot</strong>) e vá em Admin &gt; Nuvem.
               </div>
             </div>
           )}
