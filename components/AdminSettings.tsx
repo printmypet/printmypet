@@ -183,28 +183,30 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sql = `
--- 1. Garante Tabela de Clientes
+-- 1. Garante Tabela de Clientes Básica
 CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
-  name text NOT NULL,
-  cpf text,
-  email text,
-  phone text,
-  type text,
-  partner_name text,
-  instagram text,
-  address_full text,
-  zip_code text,
-  street text,
-  number text,
-  complement text,
-  neighborhood text,
-  city text,
-  state text
+  name text NOT NULL
 );
 
--- 2. AJUSTA COLUNAS OBRIGATÓRIAS (Caso tabela já exista)
+-- 2. MIGRATION: Adiciona colunas que podem estar faltando
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS email text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS phone text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS type text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS partner_name text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS instagram text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS address_full text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS zip_code text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS street text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS number text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS complement text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS neighborhood text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS city text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS state text;
+
+-- 3. AJUSTA COLUNAS PARA NÃO SEREM OBRIGATÓRIAS
 ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;
@@ -219,11 +221,11 @@ ALTER TABLE public.customers ALTER COLUMN neighborhood DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN city DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN state DROP NOT NULL;
 
--- 3. Configura CPF Único (somente se preenchido)
+-- 4. Configura CPF Único (somente se preenchido)
 ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;
 CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL;
 
--- 4. Cria Tabelas Auxiliares
+-- 5. Cria Tabelas Auxiliares
 CREATE TABLE IF NOT EXISTS public.colors (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
@@ -238,7 +240,7 @@ CREATE TABLE IF NOT EXISTS public.textures (
   name text NOT NULL UNIQUE
 );
 
--- 5. Tabela de Pedidos
+-- 6. Tabela de Pedidos
 CREATE TABLE IF NOT EXISTS public.orders (
   id uuid PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
@@ -250,16 +252,16 @@ CREATE TABLE IF NOT EXISTS public.orders (
   customer jsonb
 );
 
--- 6. MIGRATION IMPORTANTE: Adiciona a coluna customer_id se ela não existir
+-- 7. MIGRATION IMPORTANTE: Adiciona a coluna customer_id
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);
 
--- 7. Configurações de Segurança
+-- 8. Configurações de Segurança
 ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
 
--- 8. Configura Realtime de forma segura
+-- 9. Configura Realtime de forma segura
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -274,7 +276,7 @@ BEGIN
 END
 $$;
 
--- 9. Insere Texturas Padrão
+-- 10. Insere Texturas Padrão
 INSERT INTO public.textures (name) VALUES 
 ('Liso'), ('Hexagonal'), ('Listrado'), ('Pontilhado'), ('Voronoi')
 ON CONFLICT (name) DO NOTHING;
@@ -415,13 +417,12 @@ ON CONFLICT (name) DO NOTHING;
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- Script de Migração Automático
--- 1. Tabelas Base (Cria se não existir)
+{`-- Script de Migração Automático v3
+-- 1. Cria ou Atualiza Tabela Customers
 CREATE TABLE IF NOT EXISTS public.customers (...);
--- 2. Correção de Colunas (Customer)
-ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;
 ...
--- 3. Correção de Colunas (Orders)
+-- 2. Adiciona customer_id em Orders
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);
 ...
 -- (Clique no botão copiar para pegar o script completo)`}
