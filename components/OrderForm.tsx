@@ -124,6 +124,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     setCustomer(prev => ({ ...prev, phone: value }));
   };
 
+  // CEP Mask (00.000-000)
+  const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+    
+    if (value.length > 8) value = value.slice(0, 8); // Max 8 digits
+
+    // Apply mask 00.000-000
+    value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+    value = value.replace(/\.(\d{3})(\d)/, '.$1-$2');
+
+    setCustomer(prev => ({ ...prev, zipCode: value }));
+  };
+
   // CPF Mask and Auto-Fetch
   const handleCpfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
@@ -774,9 +787,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               <input 
                 type="text"
                 name="zipCode"
-                placeholder="00000-000"
+                placeholder="00.000-000"
                 value={customer.zipCode}
-                onChange={handleCustomerChange}
+                onChange={handleZipCodeChange}
+                maxLength={10}
                 className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
               />
             </div>
