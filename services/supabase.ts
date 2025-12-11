@@ -127,15 +127,18 @@ export const deleteTextureFromSupabase = async (id: string) => {
 
 export const fetchCustomerByCpf = async (cpf: string): Promise<Customer | null> => {
   if (!supabase) return null;
+  
+  // Clean the CPF
+  const cleanCpf = cpf.trim();
+  if (!cleanCpf) return null;
 
   const { data, error } = await supabase
     .from('customers')
     .select('*')
-    .eq('cpf', cpf)
+    .eq('cpf', cleanCpf)
     .single();
 
   if (error || !data) {
-    // If not found or error, just return null so the form stays as is
     return null;
   }
 
@@ -143,57 +146,68 @@ export const fetchCustomerByCpf = async (cpf: string): Promise<Customer | null> 
   return {
     id: data.id,
     name: data.name,
-    email: data.email,
-    phone: data.phone,
-    cpf: data.cpf,
-    instagram: data.instagram,
+    email: data.email || '',
+    phone: data.phone || '',
+    cpf: data.cpf || '',
+    instagram: data.instagram || '',
     type: data.type || 'final',
-    partnerName: data.partner_name,
-    address: data.address_full || '', // Fallback
-    zipCode: data.zip_code,
-    street: data.street,
-    number: data.number,
-    complement: data.complement,
-    neighborhood: data.neighborhood,
-    city: data.city,
-    state: data.state
+    partnerName: data.partner_name || '',
+    address: data.address_full || '', 
+    zipCode: data.zip_code || '',
+    street: data.street || '',
+    number: data.number || '',
+    complement: data.complement || '',
+    neighborhood: data.neighborhood || '',
+    city: data.city || '',
+    state: data.state || ''
   };
 };
 
 export const upsertCustomer = async (customer: Customer): Promise<string> => {
   if (!supabase) throw new Error("Supabase not initialized");
 
-  // 1. Check if customer exists by CPF
-  const { data: existing } = await supabase
-    .from('customers')
-    .select('id')
-    .eq('cpf', customer.cpf)
-    .single();
+  // Helper to convert empty strings to null (important for DB constraints/cleanliness)
+  const toNull = (val?: string) => (!val || val.trim() === '') ? null : val.trim();
+
+  let existing = null;
+
+  // 1. Only try to find by CPF if a valid CPF is provided
+  const cleanCpf = toNull(customer.cpf);
+  
+  if (cleanCpf) {
+    const { data } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('cpf', cleanCpf)
+      .single();
+    existing = data;
+  }
 
   const customerPayload = {
-    name: customer.name,
-    email: customer.email,
-    phone: customer.phone,
-    cpf: customer.cpf,
-    instagram: customer.instagram,
+    name: customer.name.trim(),
+    email: toNull(customer.email),
+    phone: toNull(customer.phone),
+    cpf: cleanCpf, // Can be null now
+    instagram: toNull(customer.instagram),
     type: customer.type,
-    partner_name: customer.partnerName,
-    address_full: customer.address,
-    zip_code: customer.zipCode,
-    street: customer.street,
-    number: customer.number,
-    complement: customer.complement,
-    neighborhood: customer.neighborhood,
-    city: customer.city,
-    state: customer.state
+    partner_name: toNull(customer.partnerName),
+    address_full: toNull(customer.address),
+    zip_code: toNull(customer.zipCode),
+    street: toNull(customer.street),
+    number: toNull(customer.number),
+    complement: toNull(customer.complement),
+    neighborhood: toNull(customer.neighborhood),
+    city: toNull(customer.city),
+    state: toNull(customer.state)
   };
 
   if (existing) {
-    // Update
-    await supabase.from('customers').update(customerPayload).eq('id', existing.id);
+    // Update existing customer
+    const { error } = await supabase.from('customers').update(customerPayload).eq('id', existing.id);
+    if (error) throw error;
     return existing.id;
   } else {
-    // Insert
+    // Insert new customer
     const { data: newCustomer, error } = await supabase
       .from('customers')
       .insert([customerPayload])
@@ -226,21 +240,28 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
     if (data) {
        // Map Supabase response to Order Type
        const mappedOrders: Order[] = data.map((row: any) => {
-          // If customer relationship exists, use it. Otherwise fallback to legacy JSON or placeholder
           let customerData: Customer = row.customers;
           
           if (!customerData && row.customer) {
             // Legacy JSON fallback
             customerData = row.customer;
           } else if (customerData) {
-             // Map DB columns back to frontend camelCase if needed (though Supabase JS usually handles JSONB well, 
-             // here customers is a relation, so columns come as snake_case probably unless configured)
-             // Let's ensure address mapping
+             // Map DB columns to frontend
              customerData = {
                 ...customerData,
-                partnerName: (customerData as any).partner_name || customerData.partnerName,
-                zipCode: (customerData as any).zip_code || customerData.zipCode,
-                address: (customerData as any).address_full || customerData.address,
+                email: (customerData as any).email || '',
+                phone: (customerData as any).phone || '',
+                cpf: (customerData as any).cpf || '',
+                partnerName: (customerData as any).partner_name || customerData.partnerName || '',
+                zipCode: (customerData as any).zip_code || customerData.zipCode || '',
+                address: (customerData as any).address_full || customerData.address || '',
+                // ensure other fields are not null/undefined for frontend safety
+                street: (customerData as any).street || '',
+                number: (customerData as any).number || '',
+                complement: (customerData as any).complement || '',
+                neighborhood: (customerData as any).neighborhood || '',
+                city: (customerData as any).city || '',
+                state: (customerData as any).state || '',
              };
           }
 
@@ -274,14 +295,10 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
 export const addOrderToSupabase = async (order: Order) => {
   if (!supabase) return;
 
-  // 1. Ensure Customer Exists
+  // 1. Ensure Customer Exists (or Create New)
   const customerId = await upsertCustomer(order.customer);
 
   // 2. Prepare Order Payload
-  // We remove the full 'customer' object from the insert payload to avoid duplicating data in JSONB if we want clean separation
-  // But for safety/redundancy during migration, we can keep it. 
-  // Let's prioritize the relation.
-  
   const orderPayload = {
     id: order.id,
     createdAt: order.createdAt,

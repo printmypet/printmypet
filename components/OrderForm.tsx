@@ -192,13 +192,27 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Construct full address string for display compatibility
-    const fullAddress = `${customer.street}, ${customer.number}${customer.complement ? ` - ${customer.complement}` : ''} - ${customer.neighborhood}, ${customer.city} - ${customer.state}, ${customer.zipCode}`;
+    // Construct full address string cleanly, avoiding ", ," or empty separators
+    const addressParts = [
+      customer.street ? `${customer.street}` : '',
+      customer.number ? `${customer.number}` : '',
+      customer.complement ? `${customer.complement}` : '',
+      customer.neighborhood ? `- ${customer.neighborhood}` : '',
+      customer.city ? `- ${customer.city}` : '',
+      customer.state ? `- ${customer.state}` : '',
+      customer.zipCode ? `(${customer.zipCode})` : ''
+    ];
+    
+    // Join valid parts and clean up
+    const fullAddress = addressParts
+      .filter(part => part.trim() !== '' && part.trim() !== '-')
+      .join(', ')
+      .replace(/, -/g, ' -'); // Fix any "Street, - Neighborhood" issues
 
     onSave({ 
       customer: {
         ...customer,
-        address: fullAddress
+        address: fullAddress || 'Endereço não informado'
       },
       products: cartItems, // Send the list of products
       price: totalRaw / 100, // Total Value

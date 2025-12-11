@@ -183,12 +183,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sql = `
--- 1. Tabela de Clientes
+-- 1. Tabela de Clientes (Permissiva - maioria dos campos opcionais)
 CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
   name text NOT NULL,
-  cpf text UNIQUE,
+  cpf text UNIQUE, -- Pode ser NULL, mas se tiver, deve ser único
   email text,
   phone text,
   type text, -- 'final' or 'partner'
@@ -204,6 +204,17 @@ CREATE TABLE IF NOT EXISTS public.customers (
   city text,
   state text
 );
+
+-- Se as tabelas já existirem e estiverem bloqueando NULL, rode:
+ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN city DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN state DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN address_full DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN zip_code DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN street DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN number DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN neighborhood DROP NOT NULL;
 
 -- 2. Tabela de Cores
 CREATE TABLE IF NOT EXISTS public.colors (
@@ -234,7 +245,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
   customer jsonb -- Mantido temporariamente para legado
 );
 
--- Configurações de Segurança
+-- Configurações de Segurança (Libera acesso total)
 ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;
@@ -389,35 +400,15 @@ CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   name text NOT NULL,
   cpf text UNIQUE,
-  -- ...campos restantes
-  created_at timestamptz DEFAULT now()
+  email text, -- NULLABLE
+  -- ...campos opcionais
 );
 
--- 2. Cores
-CREATE TABLE IF NOT EXISTS public.colors (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name text NOT NULL,
-  hex text NOT NULL,
-  part_type text NOT NULL,
-  created_at timestamptz DEFAULT now()
-);
-
--- 3. Texturas
-CREATE TABLE IF NOT EXISTS public.textures (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name text NOT NULL UNIQUE,
-  created_at timestamptz DEFAULT now()
-);
-
--- 4. Pedidos
-CREATE TABLE IF NOT EXISTS public.orders (
-  id uuid PRIMARY KEY,
-  products jsonb,
-  customer_id uuid REFERENCES public.customers(id),
-  -- ...
-);
-
--- (Copie o script completo clicando no botão ao lado)`}
+-- Correções se a tabela já existe:
+ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN city DROP NOT NULL;
+-- (Copie o script completo para ver todas as correções)`}
                     </pre>
                     <button 
                         onClick={copySql}
@@ -429,7 +420,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
                 </div>
                 
                 <div className="mt-4 text-xs text-slate-500">
-                   * Se as tabelas já existirem, você precisará adaptá-las ou apagá-las antes.
+                   * Se você receber erros ao inserir pedidos vazios, execute o SQL acima.
                 </div>
             </div>
         </div>
