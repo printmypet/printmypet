@@ -22,7 +22,7 @@ import {
 } from './services/supabase';
 
 // --- CONFIGURAÇÃO FIXA (HARDCODED) ---
-// PRIORIDADE MÁXIMA: Se preenchido, o app ignorará configurações do navegador.
+// SE ESTAS CHAVES ESTIVEREM AQUI, ELAS SERÃO USADAS.
 const FIXED_CONFIG = {
   url: "https://ptymvjqnsxdllljqaeqz.supabase.co",
   key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0eW12anFuc3hkbGxsanFhZXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzOTk5NjgsImV4cCI6MjA4MDk3NTk2OH0.N6To6n4hKRBFAtQKq1XUahR-LEDyfenekBiI_GoLkDk"
@@ -71,54 +71,59 @@ const App: React.FC = () => {
 
   // Init Supabase and Load Data
   useEffect(() => {
-    // 1. Determine Environment
-    const envMode = localStorage.getItem('app-env-mode') || 'prod';
-    setIsTestMode(envMode === 'test');
-
     let configToUse: SupabaseConfig | null = null;
-    
-    // --- LÓGICA DE PRIORIDADE CORRIGIDA ---
-    
-    // 1. Prioridade Máxima: FIXED_CONFIG (Código)
-    // Se o usuário colocou a URL e Key no código, usamos ela sempre em modo PROD.
-    if (envMode === 'prod' && FIXED_CONFIG.url && FIXED_CONFIG.url.includes('supabase.co') && FIXED_CONFIG.key) {
-        console.log("App: Usando credenciais HARDCODED (Prioridade Máxima).");
+    let isTesting = false;
+
+    // 1. VERIFICAÇÃO FORÇADA DA CONFIGURAÇÃO FIXA
+    // Se existir configuração fixa no código, usamos ela e ignoramos o resto.
+    if (FIXED_CONFIG.url && FIXED_CONFIG.key && FIXED_CONFIG.url.includes('http')) {
+        console.log("App: Usando CREDENCIAIS FIXAS do código.");
         configToUse = {
             supabaseUrl: FIXED_CONFIG.url,
             supabaseKey: FIXED_CONFIG.key
         };
-    }
-
-    // 2. Fallback: LocalStorage (Apenas se não tiver Fixed Config ou se for modo Teste)
-    if (!configToUse) {
-        const configKey = envMode === 'test' ? 'app-supabase-config-test' : 'app-supabase-config';
+        // Força modo produção se estiver usando chaves fixas para evitar conflito
+        localStorage.setItem('app-env-mode', 'prod');
+        isTesting = false;
+    } else {
+        // Fallback para lógica antiga se não tiver chaves no código
+        const envMode = localStorage.getItem('app-env-mode') || 'prod';
+        isTesting = envMode === 'test';
+        
+        const configKey = isTesting ? 'app-supabase-config-test' : 'app-supabase-config';
         const localConfigStr = localStorage.getItem(configKey);
+
         if (localConfigStr) {
             try {
                 const parsed = JSON.parse(localConfigStr);
                 if (parsed && parsed.supabaseUrl && parsed.supabaseKey) {
                     configToUse = parsed;
-                    console.log("App: Usando configuração do LocalStorage.");
                 }
             } catch (e) {
-                console.warn("App: Configuração local inválida.");
+                console.warn("Config local inválida");
             }
         }
     }
 
-    // 3. Tentativa de Conexão
+    setIsTestMode(isTesting);
+
+    // 2. TENTATIVA DE CONEXÃO
     let connected = false;
     let unsubscribe = () => {};
 
     if (configToUse) {
+      // Tenta inicializar
       connected = initSupabase(configToUse);
-      setIsOnline(connected);
       
-      if (!connected) {
-         console.error("App: initSupabase retornou false. Verifique URL/Key.");
+      if (connected) {
+          console.log("App: Conexão inicializada com sucesso.");
+          setIsOnline(true);
+      } else {
+          console.error("App: Falha ao inicializar Supabase. Verifique URL/Key.");
+          setIsOnline(false);
       }
     } else {
-      console.warn("App: Nenhuma configuração encontrada.");
+      console.warn("App: Nenhuma configuração disponível.");
       setIsOnline(false);
     }
 
@@ -144,6 +149,7 @@ const App: React.FC = () => {
 
     } else {
       // Fallback to Local Storage (Offline Mode)
+      console.log("App: Entrando em modo Offline (Local Storage).");
       const savedOrders = localStorage.getItem('3d-print-orders');
       if (savedOrders) {
         try {
