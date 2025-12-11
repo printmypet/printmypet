@@ -183,7 +183,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sql = `
--- 1. Tabela de Clientes
+-- 1. Cria a tabela se não existir
 CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
   state text
 );
 
--- GARANTE QUE OS CAMPOS NÃO SÃO OBRIGATÓRIOS (Rode isso se der erro de 'not-null constraint')
+-- 2. REMOVE A OBRIGATORIEDADE (Essencial)
 ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;
@@ -219,11 +219,11 @@ ALTER TABLE public.customers ALTER COLUMN neighborhood DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN city DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN state DROP NOT NULL;
 
--- Garante Indice Único para CPF apenas se não for nulo
+-- 3. Configura CPF Único (somente se preenchido)
 ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;
 CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL;
 
--- 2. Tabela de Cores
+-- 4. Cria outras tabelas
 CREATE TABLE IF NOT EXISTS public.colors (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
@@ -232,14 +232,12 @@ CREATE TABLE IF NOT EXISTS public.colors (
   part_type text NOT NULL
 );
 
--- 3. Tabela de Texturas
 CREATE TABLE IF NOT EXISTS public.textures (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
   name text NOT NULL UNIQUE
 );
 
--- 4. Tabela de Pedidos
 CREATE TABLE IF NOT EXISTS public.orders (
   id uuid PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
@@ -252,16 +250,28 @@ CREATE TABLE IF NOT EXISTS public.orders (
   customer jsonb
 );
 
--- Configurações de Segurança
+-- 5. Segurança
 ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
 
--- Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+-- 6. Configura Realtime de forma segura
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 
+    FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+    AND schemaname = 'public' 
+    AND tablename = 'orders'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+  END IF;
+END
+$$;
 
--- Inserir Texturas Padrão
+-- 7. Insere texturas padrão
 INSERT INTO public.textures (name) VALUES 
 ('Liso'), ('Hexagonal'), ('Listrado'), ('Pontilhado'), ('Voronoi')
 ON CONFLICT (name) DO NOTHING;
@@ -402,23 +412,18 @@ ON CONFLICT (name) DO NOTHING;
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- 1. Clientes
-CREATE TABLE IF NOT EXISTS public.customers (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name text NOT NULL,
-  cpf text,
-  -- ...campos opcionais
-);
-
--- GARANTE QUE OS CAMPOS NÃO SÃO OBRIGATÓRIOS (Rode isso se der erro)
+{`-- SQL Seguro (Rode quantas vezes precisar)
+-- 1. Cria tabelas e remove obrigatoriedade
+CREATE TABLE IF NOT EXISTS public.customers (...);
 ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;
-
--- Garante Indice Único para CPF apenas se não for nulo
+...
+-- 2. CPF Único (Condicional)
 ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_cpf_key;
 CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL;
--- (Copie o script completo para ver todas as correções)`}
+...
+-- 3. Realtime Seguro
+DO $$ BEGIN IF NOT EXISTS (...) THEN ALTER PUBLICATION... END IF; END $$;`}
                     </pre>
                     <button 
                         onClick={copySql}
