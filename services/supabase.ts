@@ -277,7 +277,10 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
 
           return {
             ...row,
-            customer: customerData
+            customer: customerData,
+            // Explicitly map snake_case columns from DB to camelCase properties for App
+            shippingCost: row.shipping_cost,
+            isPaid: row.is_paid
           };
        });
        onUpdate(mappedOrders);
@@ -309,21 +312,7 @@ export const addOrderToSupabase = async (order: Order) => {
   const customerId = await upsertCustomer(order.customer);
 
   // 2. Prepare Order Payload
-  const orderPayload = {
-    id: order.id,
-    createdAt: order.createdAt,
-    status: order.status,
-    price: order.price,
-    shipping_cost: order.shippingCost, // DB uses snake_case sometimes depending on migration, keeping consistent with SELECT
-    is_paid: order.isPaid,
-    customer_id: customerId, // Foreign Key
-    products: order.products // Keep products as JSON for now
-  };
-  
-  // Note: Handle snake_case vs camelCase mapping if needed. 
-  // Based on the SQL provided earlier: price, shipping_cost, is_paid.
-  // We need to match the INSERT statement columns.
-  // Let's refine payload to match SQL columns exactly.
+  // We match the INSERT statement columns (snake_case)
   const cleanPayload = {
     id: order.id,
     created_at: order.createdAt,

@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS public.textures (
   name text NOT NULL UNIQUE
 );
 
--- 6. Tabela de Pedidos
+-- 6. Tabela de Pedidos e Ajustes de Colunas
 CREATE TABLE IF NOT EXISTS public.orders (
   id uuid PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
@@ -252,6 +252,10 @@ CREATE TABLE IF NOT EXISTS public.orders (
   customer jsonb
 );
 
+-- Garante colunas de suporte
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean;
+
 -- 7. MIGRATION IMPORTANTE: Adiciona a coluna customer_id
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);
 
@@ -261,7 +265,19 @@ ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
 
--- 9. Configura Realtime de forma segura
+-- 9. Renomeia colunas se foram criadas erradas (CamelCase -> snake_case)
+DO $$
+BEGIN
+  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shippingCost') THEN
+    ALTER TABLE public.orders RENAME COLUMN "shippingCost" TO shipping_cost;
+  END IF;
+  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='isPaid') THEN
+    ALTER TABLE public.orders RENAME COLUMN "isPaid" TO is_paid;
+  END IF;
+END
+$$;
+
+-- 10. Configura Realtime de forma segura
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -276,7 +292,7 @@ BEGIN
 END
 $$;
 
--- 10. Insere Texturas Padrão
+-- 11. Insere Texturas Padrão
 INSERT INTO public.textures (name) VALUES 
 ('Liso'), ('Hexagonal'), ('Listrado'), ('Pontilhado'), ('Voronoi')
 ON CONFLICT (name) DO NOTHING;
