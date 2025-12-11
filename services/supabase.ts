@@ -374,7 +374,8 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
     const { data, error } = await supabase
       .from('orders')
       .select('*, customers(*)')
-      .order('createdAt', { ascending: false });
+      // Fix: order by created_at (DB column), not createdAt (App property)
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching orders:', error);
@@ -413,6 +414,7 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
             ...row,
             customer: customerData,
             // Explicitly map snake_case columns from DB to camelCase properties for App
+            createdAt: row.created_at || new Date().toISOString(), // Fix: Map created_at to createdAt
             shippingCost: row.shipping_cost,
             isPaid: row.is_paid
           };
