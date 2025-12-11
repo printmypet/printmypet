@@ -183,7 +183,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sqlParts = [
-      "-- SCRIPT DE CONFIGURAÇÃO - PRINTMY[PET]3D (v6 - Fix Colunas)",
+      "-- SCRIPT DE CONFIGURAÇÃO - PRINTMY[PET]3D (v7 - Safe Migration)",
       "",
       "-- 1. Tabela de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (",
@@ -244,43 +244,31 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean DEFAULT false;",
       "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES public.customers(id);",
       "",
-      "-- 4. CORREÇÃO DE COLUNAS (ROBUSTO)",
+      "-- 4. MIGRAÇÃO SEGURA DE DADOS",
       "DO $$",
       "BEGIN",
-      "  -- A. shippingCost -> shipping_cost",
+      "  -- A. Migrar shippingCost -> shipping_cost",
       "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shippingCost') THEN",
-      "    IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shipping_cost') THEN",
-      "      ALTER TABLE public.orders DROP COLUMN \"shippingCost\";",
-      "    ELSE",
-      "      ALTER TABLE public.orders RENAME COLUMN \"shippingCost\" TO shipping_cost;",
-      "    END IF;",
+      "    UPDATE public.orders SET shipping_cost = \"shippingCost\" WHERE \"shippingCost\" IS NOT NULL;",
+      "    ALTER TABLE public.orders DROP COLUMN \"shippingCost\";",
       "  END IF;",
       "",
-      "  -- B. shippingcost -> shipping_cost",
+      "  -- B. Migrar shippingcost -> shipping_cost",
       "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shippingcost') THEN",
-      "    IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='shipping_cost') THEN",
-      "      ALTER TABLE public.orders DROP COLUMN shippingcost;",
-      "    ELSE",
-      "      ALTER TABLE public.orders RENAME COLUMN shippingcost TO shipping_cost;",
-      "    END IF;",
+      "    UPDATE public.orders SET shipping_cost = shippingcost WHERE shippingcost IS NOT NULL;",
+      "    ALTER TABLE public.orders DROP COLUMN shippingcost;",
       "  END IF;",
       "",
-      "  -- C. isPaid -> is_paid",
+      "  -- C. Migrar isPaid -> is_paid",
       "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='isPaid') THEN",
-      "    IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='is_paid') THEN",
-      "      ALTER TABLE public.orders DROP COLUMN \"isPaid\";",
-      "    ELSE",
-      "      ALTER TABLE public.orders RENAME COLUMN \"isPaid\" TO is_paid;",
-      "    END IF;",
+      "    UPDATE public.orders SET is_paid = \"isPaid\" WHERE \"isPaid\" IS NOT NULL;",
+      "    ALTER TABLE public.orders DROP COLUMN \"isPaid\";",
       "  END IF;",
       "",
-      "  -- D. ispaid -> is_paid",
+      "  -- D. Migrar ispaid -> is_paid",
       "  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='ispaid') THEN",
-      "    IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='is_paid') THEN",
-      "      ALTER TABLE public.orders DROP COLUMN ispaid;",
-      "    ELSE",
-      "      ALTER TABLE public.orders RENAME COLUMN ispaid TO is_paid;",
-      "    END IF;",
+      "    UPDATE public.orders SET is_paid = ispaid WHERE ispaid IS NOT NULL;",
+      "    ALTER TABLE public.orders DROP COLUMN ispaid;",
       "  END IF;",
       "END",
       "$$;",
@@ -302,7 +290,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     ];
     
     navigator.clipboard.writeText(sqlParts.join('\n'));
-    alert("SQL Corrigido (v6) copiado! Tente rodar agora.");
+    alert("SQL Corrigido (v7 - Safe Migration) copiado! Tente rodar agora.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = {
@@ -437,7 +425,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- SCRIPT DE CONFIGURAÇÃO (v6)
+{`-- SCRIPT DE CONFIGURAÇÃO (v7)
 -- (Clique no botão copiar para ver tudo)
 CREATE TABLE IF NOT EXISTS public.customers (...);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric;
