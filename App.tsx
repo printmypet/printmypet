@@ -181,8 +181,9 @@ const App: React.FC = () => {
     if (isOnline) {
       try {
         await addOrderToSupabase(newOrder);
-      } catch (e) {
-        alert("Erro ao salvar no Supabase. Verifique sua conexão.");
+      } catch (e: any) {
+        // Show specific error message
+        alert(`Erro ao salvar no Supabase: ${e.message || JSON.stringify(e)}`);
         return;
       }
     } else {

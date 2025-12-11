@@ -183,18 +183,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sql = `
--- 1. Tabela de Clientes (Permissiva - maioria dos campos opcionais)
+-- 1. Tabela de Clientes
 CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
   name text NOT NULL,
-  cpf text UNIQUE, -- Pode ser NULL, mas se tiver, deve ser único
+  cpf text UNIQUE,
   email text,
   phone text,
-  type text, -- 'final' or 'partner'
+  type text,
   partner_name text,
   instagram text,
-  -- Endereço
   address_full text,
   zip_code text,
   street text,
@@ -205,16 +204,20 @@ CREATE TABLE IF NOT EXISTS public.customers (
   state text
 );
 
--- Se as tabelas já existirem e estiverem bloqueando NULL, rode:
+-- GARANTE QUE OS CAMPOS NÃO SÃO OBRIGATÓRIOS (Rode isso se der erro de 'not-null constraint')
 ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN city DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN state DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL; -- Importante!
+ALTER TABLE public.customers ALTER COLUMN partner_name DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN instagram DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN address_full DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN zip_code DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN street DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN number DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN complement DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN neighborhood DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN city DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN state DROP NOT NULL;
 
 -- 2. Tabela de Cores
 CREATE TABLE IF NOT EXISTS public.colors (
@@ -234,18 +237,18 @@ CREATE TABLE IF NOT EXISTS public.textures (
 
 -- 4. Tabela de Pedidos
 CREATE TABLE IF NOT EXISTS public.orders (
-  id uuid PRIMARY KEY, -- Mantemos ID gerado no front por enquanto
+  id uuid PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
   status text,
   price numeric,
   shipping_cost numeric,
   is_paid boolean,
-  products jsonb, -- Mantemos produtos configurados como JSON
+  products jsonb,
   customer_id uuid REFERENCES public.customers(id),
-  customer jsonb -- Mantido temporariamente para legado
+  customer jsonb
 );
 
--- Configurações de Segurança (Libera acesso total)
+-- Configurações de Segurança
 ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;
@@ -254,7 +257,7 @@ ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
 -- Realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
 
--- Inserir Texturas Padrão (Se não existirem)
+-- Inserir Texturas Padrão
 INSERT INTO public.textures (name) VALUES 
 ('Liso'), ('Hexagonal'), ('Listrado'), ('Pontilhado'), ('Voronoi')
 ON CONFLICT (name) DO NOTHING;
@@ -404,10 +407,10 @@ CREATE TABLE IF NOT EXISTS public.customers (
   -- ...campos opcionais
 );
 
--- Correções se a tabela já existe:
+-- GARANTE QUE OS CAMPOS NÃO SÃO OBRIGATÓRIOS (Rode isso se der erro)
 ALTER TABLE public.customers ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE public.customers ALTER COLUMN phone DROP NOT NULL;
-ALTER TABLE public.customers ALTER COLUMN city DROP NOT NULL;
+ALTER TABLE public.customers ALTER COLUMN cpf DROP NOT NULL;
 -- (Copie o script completo para ver todas as correções)`}
                     </pre>
                     <button 
