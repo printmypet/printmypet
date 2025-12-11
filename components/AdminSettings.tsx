@@ -388,21 +388,44 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sqlParts = [
-      "-- SCRIPT DE CONFIGURAÇÃO (v8)",
+      "-- SCRIPT COMPLETO (v9)",
       "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS type text DEFAULT 'final';",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS partner_name text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS email text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS phone text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS instagram text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS zip_code text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS address_full text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS street text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS number text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS complement text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS neighborhood text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS city text;",
+      "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS state text;",
       "CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL AND cpf != '';",
-      "CREATE TABLE IF NOT EXISTS public.colors (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, name text NOT NULL, hex text NOT NULL, part_type text NOT NULL, position integer);",
+      
+      "CREATE TABLE IF NOT EXISTS public.colors (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, name text NOT NULL, hex text NOT NULL, part_type text NOT NULL, position integer DEFAULT 999);",
+      "ALTER TABLE public.colors ADD COLUMN IF NOT EXISTS position integer DEFAULT 999;",
+
       "CREATE TABLE IF NOT EXISTS public.textures (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, name text NOT NULL UNIQUE);",
+      
       "CREATE TABLE IF NOT EXISTS public.orders (id uuid PRIMARY KEY, status text, price numeric, shipping_cost numeric, is_paid boolean, products jsonb, customer jsonb, customer_id uuid REFERENCES public.customers(id));",
+      "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric DEFAULT 0;",
+      "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean DEFAULT false;",
+      
       "CREATE TABLE IF NOT EXISTS public.app_users (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, username text NOT NULL UNIQUE, password text NOT NULL, role text DEFAULT 'user');",
+      
       "ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;",
+      "ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;",
+      "ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;",
+      "ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;",
       "ALTER TABLE public.app_users DISABLE ROW LEVEL SECURITY;"
     ];
     
     navigator.clipboard.writeText(sqlParts.join('\n'));
-    alert("SQL Simplificado copiado! Use para setup rápido.");
+    alert("SQL Completo copiado! Cole no SQL Editor do Supabase.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = { base: 'Base', ball: 'Bola', top: 'Tampa/Topo' };
