@@ -21,6 +21,14 @@ import {
   fetchTexturesFromSupabase
 } from './services/supabase';
 
+// --- CONFIGURAÇÃO FIXA (OPCIONAL) ---
+// Preencha estes campos para que o app funcione em aba anônima ou outros dispositivos
+// sem precisar configurar manualmente pelo painel Admin.
+const FIXED_CONFIG = {
+  url: "https://ptymvjqnsxdllljqaeqz.supabase.co", // Coloque sua URL do Supabase aqui (ex: https://xyz.supabase.co)
+  key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0eW12anFuc3hkbGxsanFhZXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzOTk5NjgsImV4cCI6MjA4MDk3NTk2OH0.N6To6n4hKRBFAtQKq1XUahR-LEDyfenekBiI_GoLkDk"  // Coloque sua KEY (anon/public) aqui
+};
+
 const App: React.FC = () => {
   // Auth State
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
@@ -71,24 +79,30 @@ const App: React.FC = () => {
     const configKey = envMode === 'test' ? 'app-supabase-config-test' : 'app-supabase-config';
     const localConfigStr = localStorage.getItem(configKey);
     
-    // Check for Environment Variables (Vercel / .env)
+    // Check for Environment Variables (Vercel / .env) OR Fixed Config
     const envConfig: SupabaseConfig = {
-      supabaseUrl: (import.meta as any).env?.VITE_SUPABASE_URL || '',
-      supabaseKey: (import.meta as any).env?.VITE_SUPABASE_KEY || ''
+      supabaseUrl: (import.meta as any).env?.VITE_SUPABASE_URL || FIXED_CONFIG.url || '',
+      supabaseKey: (import.meta as any).env?.VITE_SUPABASE_KEY || FIXED_CONFIG.key || ''
     };
 
     let configToUse: SupabaseConfig | null = null;
     let connected = false;
     let unsubscribe = () => {};
 
+    // Prioridade:
+    // 1. Configuração Local salva (se existir e não estivermos forçando prod hardcoded)
+    // 2. Variáveis de Ambiente ou Fixed Config (se for prod)
+    
     if (localConfigStr) {
       try {
         configToUse = JSON.parse(localConfigStr);
       } catch (e) {
         console.error("Invalid local config", e);
       }
-    } else if (envMode === 'prod' && envConfig.supabaseUrl && envConfig.supabaseKey) {
-      // Only fallback to .env for production
+    } 
+    
+    // Se não achou local (ex: aba anônima), ou se queremos garantir o fallback para prod
+    if (!configToUse && envMode === 'prod' && envConfig.supabaseUrl && envConfig.supabaseKey) {
       configToUse = envConfig;
     }
 

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User, Lock, Key, ArrowRight, LogIn } from 'lucide-react';
+import { User, Lock, Key, ArrowRight, LogIn, WifiOff } from 'lucide-react';
 import { Button } from './ui/Button';
 import { loginUser } from '../services/supabase';
 import { AppUser } from '../types';
@@ -43,7 +43,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isOnline }) => {
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-slate-200">
         
         {/* Header Visual */}
-        <div className="bg-slate-900 p-8 text-center relative overflow-hidden">
+        <div className={`p-8 text-center relative overflow-hidden ${isOnline ? 'bg-slate-900' : 'bg-slate-800'}`}>
            <div className="relative z-10">
              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/20 mb-4 backdrop-blur-sm border border-indigo-500/30">
                <LogIn className="w-8 h-8 text-indigo-400" />
@@ -67,6 +67,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isOnline }) => {
              <h2 className="text-xl font-semibold text-slate-800">Bem-vindo(a)</h2>
              <p className="text-slate-500 text-sm">Faça login para acessar o sistema.</p>
           </div>
+
+          {!isOnline && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm flex gap-3 items-start">
+              <WifiOff className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div>
+                 <strong className="block mb-1">Modo Offline (Sem Banco de Dados)</strong>
+                 O sistema não encontrou a configuração do Supabase. Isso é comum em abas anônimas.
+                 <br/><br/>
+                 Para configurar, entre como <strong>admin</strong> (senha: <strong>passroot</strong>) e vá em Admin > Nuvem.
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg flex items-center gap-2">
@@ -113,12 +125,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isOnline }) => {
               {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
             </Button>
           </form>
-
-          {!isOnline && (
-            <p className="mt-6 text-center text-xs text-amber-600 bg-amber-50 p-2 rounded">
-              Modo Offline: Login disponível apenas para 'admin'.
-            </p>
-          )}
         </div>
       </div>
     </div>
