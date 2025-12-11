@@ -624,12 +624,11 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             </div>
 
             <div className="md:col-span-1 relative">
-              <label className="block text-sm font-medium text-slate-700 mb-1">CPF *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">CPF</label>
               <div className="relative">
                 <input 
                   type="text"
                   name="cpf"
-                  required
                   placeholder="000.000.000-00"
                   value={customer.cpf}
                   onChange={handleCpfChange}
@@ -697,7 +696,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
             {customer.type === 'partner' && (
               <div className="md:col-span-2 animate-fade-in bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-2">
-                <label className="block text-sm font-medium text-indigo-900 mb-1">Nome da Loja / Parceiro *</label>
+                <label className="block text-sm font-medium text-indigo-900 mb-1">Nome da Loja / Parceiro</label>
                 <input 
                   type="text"
                   name="partnerName"
@@ -710,11 +709,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             )}
 
             <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">E-mail *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
               <input 
                 type="email"
                 name="email"
-                required
                 value={customer.email}
                 onChange={handleCustomerChange}
                 className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
@@ -722,11 +720,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             </div>
 
             <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Telefone / WhatsApp *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Telefone / WhatsApp</label>
               <input 
                 type="tel"
                 name="phone"
-                required
                 placeholder="(00) 00000-0000"
                 value={customer.phone}
                 onChange={handlePhoneChange}
@@ -771,11 +768,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             </div>
 
              <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Rua / Logradouro *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Rua / Logradouro</label>
               <input 
                 type="text"
                 name="street"
-                required
                 value={customer.street}
                 onChange={handleCustomerChange}
                 className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
@@ -784,11 +780,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
             <div className="grid grid-cols-2 gap-4 md:col-span-1">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Número *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Número</label>
                 <input 
                   type="text"
                   name="number"
-                  required
                   value={customer.number}
                   onChange={handleCustomerChange}
                   className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
@@ -808,11 +803,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             </div>
 
              <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Bairro *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Bairro</label>
               <input 
                 type="text"
                 name="neighborhood"
-                required
                 value={customer.neighborhood}
                 onChange={handleCustomerChange}
                 className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
@@ -821,22 +815,20 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
             <div className="grid grid-cols-3 gap-4 md:col-span-2">
                <div className="col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Cidade *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Cidade</label>
                 <input 
                   type="text"
                   name="city"
-                  required
                   value={customer.city}
                   onChange={handleCustomerChange}
                   className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
                 />
               </div>
                <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">UF *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">UF</label>
                 <input 
                   type="text"
                   name="state"
-                  required
                   maxLength={2}
                   placeholder="SP"
                   value={customer.state}
