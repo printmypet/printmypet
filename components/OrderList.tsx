@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck } from 'lucide-react';
+import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck, AlertCircle } from 'lucide-react';
 import { Order, OrderStatus } from '../types';
 import { Button } from './ui/Button';
 
@@ -230,8 +230,12 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                                         <span className="text-slate-800 text-xs">{product.textureValue}</span>
                                     </div>
                                     {product.observations && (
-                                        <div className="text-xs text-slate-500 italic mt-1 pt-1 border-t border-slate-200">
-                                            "{product.observations}"
+                                        <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-md flex gap-2 items-start animate-fade-in">
+                                            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                            <div className="text-xs text-amber-900">
+                                                <span className="font-bold block text-amber-700 mb-0.5 uppercase tracking-wide text-[10px]">Observação:</span>
+                                                {product.observations}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
