@@ -125,6 +125,41 @@ export const deleteTextureFromSupabase = async (id: string) => {
 
 // --- Customer Management ---
 
+export const fetchCustomerByCpf = async (cpf: string): Promise<Customer | null> => {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('cpf', cpf)
+    .single();
+
+  if (error || !data) {
+    // If not found or error, just return null so the form stays as is
+    return null;
+  }
+
+  // Map snake_case from DB to camelCase for frontend
+  return {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    cpf: data.cpf,
+    instagram: data.instagram,
+    type: data.type || 'final',
+    partnerName: data.partner_name,
+    address: data.address_full || '', // Fallback
+    zipCode: data.zip_code,
+    street: data.street,
+    number: data.number,
+    complement: data.complement,
+    neighborhood: data.neighborhood,
+    city: data.city,
+    state: data.state
+  };
+};
+
 export const upsertCustomer = async (customer: Customer): Promise<string> => {
   if (!supabase) throw new Error("Supabase not initialized");
 

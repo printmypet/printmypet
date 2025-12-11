@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2, Users, Truck } from 'lucide-react';
+import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2, Users, Truck, Loader2, Search } from 'lucide-react';
 import { 
   ColorOption,
   Order, 
@@ -9,6 +10,7 @@ import {
   PartsColors
 } from '../types';
 import { Button } from './ui/Button';
+import { fetchCustomerByCpf } from '../services/supabase';
 
 interface OrderFormProps {
   partsColors: PartsColors;
@@ -42,6 +44,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   // State to control visibility of dog name input
   const [showDogNameInput, setShowDogNameInput] = useState(false);
+  const [isSearchingCpf, setIsSearchingCpf] = useState(false);
 
   // Price handling - Separated into Products and Shipping
   const [productsPriceRaw, setProductsPriceRaw] = useState<number>(0); // Stores cents
@@ -121,8 +124,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     setCustomer(prev => ({ ...prev, phone: value }));
   };
 
-  // CPF Mask
-  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // CPF Mask and Auto-Fetch
+  const handleCpfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
     
     if (value.length > 11) value = value.slice(0, 11);
@@ -133,6 +136,27 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
 
     setCustomer(prev => ({ ...prev, cpf: value }));
+
+    // Trigger search if full CPF
+    if (value.length === 14) {
+      setIsSearchingCpf(true);
+      try {
+        const foundCustomer = await fetchCustomerByCpf(value);
+        if (foundCustomer) {
+          // Fill fields with found data
+          setCustomer(prev => ({
+            ...prev,
+            ...foundCustomer,
+            // Keep the entered CPF to be safe
+            cpf: value 
+          }));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSearchingCpf(false);
+      }
+    }
   };
 
   // Currency Handlers
@@ -598,8 +622,46 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                <User className="w-5 h-5 text-indigo-600" />
                <h3 className="text-lg font-medium text-slate-900">Informações de Contato</h3>
             </div>
+
+            <div className="md:col-span-1 relative">
+              <label className="block text-sm font-medium text-slate-700 mb-1">CPF *</label>
+              <div className="relative">
+                <input 
+                  type="text"
+                  name="cpf"
+                  required
+                  placeholder="000.000.000-00"
+                  value={customer.cpf}
+                  onChange={handleCpfChange}
+                  maxLength={14}
+                  className="w-full rounded-lg border-slate-300 border p-2 pr-10 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                  {isSearchingCpf ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+                  ) : (
+                    <Search className="w-5 h-5" />
+                  )}
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Digite o CPF para buscar cadastro automaticamente.
+              </p>
+            </div>
+
+            <div className="md:col-span-1">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo do Cliente *</label>
+              <input 
+                type="text"
+                name="name"
+                required
+                value={customer.name}
+                onChange={handleCustomerChange}
+                className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              />
+            </div>
             
-            <div className="md:col-span-2 mb-2">
+            <div className="md:col-span-2 mb-2 mt-2">
               <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Cliente</label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer p-3 border border-slate-200 rounded-lg hover:bg-slate-50 flex-1">
@@ -646,32 +708,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 />
               </div>
             )}
-
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo do Cliente *</label>
-              <input 
-                type="text"
-                name="name"
-                required
-                value={customer.name}
-                onChange={handleCustomerChange}
-                className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-              />
-            </div>
-
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">CPF *</label>
-              <input 
-                type="text"
-                name="cpf"
-                required
-                placeholder="000.000.000-00"
-                value={customer.cpf}
-                onChange={handleCpfChange}
-                maxLength={14}
-                className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-              />
-            </div>
 
             <div className="md:col-span-1">
               <label className="block text-sm font-medium text-slate-700 mb-1">E-mail *</label>
