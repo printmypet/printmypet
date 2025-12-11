@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
-import { PartsColors, SupabaseConfig, Texture } from '../types';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical } from 'lucide-react';
+import { PartsColors, SupabaseConfig, Texture, ColorOption } from '../types';
 import { Button } from './ui/Button';
-import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase } from '../services/supabase';
+import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions } from '../services/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AdminSettingsProps {
@@ -35,6 +35,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [newTextureName, setNewTextureName] = useState('');
   const [isProcessingColor, setIsProcessingColor] = useState(false);
   const [isProcessingTexture, setIsProcessingTexture] = useState(false);
+  
+  // Drag and Drop State
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
 
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>({
     supabaseUrl: '',
@@ -90,6 +93,46 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       onConfigUpdate();
     }
   };
+
+  // --- Drag and Drop Handlers ---
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    setDraggedItemIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Firefox requires data to be set
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Necessary to allow dropping
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedItemIndex === null || draggedItemIndex === dropIndex) return;
+
+    const newList = [...partsColors[activePart]];
+    const [movedItem] = newList.splice(draggedItemIndex, 1);
+    newList.splice(dropIndex, 0, movedItem);
+
+    // Update Local State Immediately
+    onUpdatePartsColors({
+      ...partsColors,
+      [activePart]: newList
+    });
+
+    setDraggedItemIndex(null);
+
+    // If Online, Update Positions in DB
+    if (isOnline) {
+       try {
+         await updateColorPositions(newList);
+       } catch (err) {
+         console.error("Failed to update positions in DB", err);
+       }
+    }
+  };
+
 
   const handleAddColor = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,7 +226,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sqlParts = [
-      "-- SCRIPT DE CONFIGURAÇÃO - PRINTMY[PET]3D (v7 - Safe Migration)",
+      "-- SCRIPT DE CONFIGURAÇÃO - PRINTMY[PET]3D (v8 - Ordering Support)",
       "",
       "-- 1. Tabela de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (",
@@ -223,6 +266,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "  hex text NOT NULL,",
       "  part_type text NOT NULL",
       ");",
+      "",
+      "-- Adiciona coluna de posição se não existir",
+      "ALTER TABLE public.colors ADD COLUMN IF NOT EXISTS position integer;",
       "",
       "CREATE TABLE IF NOT EXISTS public.textures (",
       "  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,",
@@ -290,7 +336,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     ];
     
     navigator.clipboard.writeText(sqlParts.join('\n'));
-    alert("SQL Corrigido (v7 - Safe Migration) copiado! Tente rodar agora.");
+    alert("SQL Corrigido (v8 - Ordering Support) copiado! Tente rodar agora.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = {
@@ -420,16 +466,17 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                 </div>
                 
                 <p className="text-sm text-slate-400 mb-4">
-                    Copie o SQL abaixo e rode no Supabase para corrigir tabelas e criar colunas faltantes.
+                    Copie o SQL abaixo e rode no Supabase para criar a coluna de posição.
                 </p>
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- SCRIPT DE CONFIGURAÇÃO (v7)
+{`-- SCRIPT DE CONFIGURAÇÃO (v8)
 -- (Clique no botão copiar para ver tudo)
 CREATE TABLE IF NOT EXISTS public.customers (...);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean;
+ALTER TABLE public.colors ADD COLUMN IF NOT EXISTS position integer;
 -- (+ Migrações automáticas de colunas)`}
                     </pre>
                     <button 
@@ -480,8 +527,9 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean;
           </div>
           
           <div className="p-6 space-y-6">
-            <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3 text-sm text-indigo-800 mb-4">
-              Editando cores para: <strong>{partLabels[activePart]}</strong>
+            <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3 text-sm text-indigo-800 mb-4 flex justify-between items-center">
+              <span>Editando cores para: <strong>{partLabels[activePart]}</strong></span>
+              <span className="text-xs text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded">Arraste para reordenar</span>
             </div>
 
             <form onSubmit={handleAddColor} className="flex gap-4 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
@@ -515,9 +563,19 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean;
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Cores Cadastradas - {partLabels[activePart]} ({partsColors[activePart].length})
               </label>
-              {partsColors[activePart].map((color) => (
-                <div key={color.hex + color.name} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg hover:border-slate-300 transition-colors shadow-sm">
+              {partsColors[activePart].map((color, index) => (
+                <div 
+                  key={color.hex + color.name} 
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, index)}
+                  className={`flex items-center justify-between p-3 bg-white border rounded-lg transition-all shadow-sm ${draggedItemIndex === index ? 'opacity-50 border-dashed border-indigo-400' : 'border-slate-100 hover:border-indigo-200'}`}
+                >
                   <div className="flex items-center gap-3">
+                    <div className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-indigo-400 p-1">
+                       <GripVertical className="w-4 h-4" />
+                    </div>
                     <div 
                       className="w-8 h-8 rounded-full border border-slate-200 shadow-inner" 
                       style={{ backgroundColor: color.hex }}

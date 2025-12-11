@@ -60,7 +60,12 @@ export const getClient = () => supabase;
 export const fetchColorsFromSupabase = async (): Promise<PartsColors | null> => {
   if (!supabase) return null;
 
-  const { data, error } = await supabase.from('colors').select('*');
+  // Order by position ascending, then by created_at as fallback
+  const { data, error } = await supabase
+    .from('colors')
+    .select('*')
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true });
   
   if (error || !data) {
     console.error('Error fetching colors:', error);
@@ -71,7 +76,12 @@ export const fetchColorsFromSupabase = async (): Promise<PartsColors | null> => 
   const newColors: PartsColors = { base: [], ball: [], top: [] };
   
   data.forEach((item: any) => {
-    const color: ColorOption = { id: item.id, name: item.name, hex: item.hex };
+    const color: ColorOption = { 
+      id: item.id, 
+      name: item.name, 
+      hex: item.hex,
+      position: item.position 
+    };
     if (item.part_type === 'base') newColors.base.push(color);
     if (item.part_type === 'ball') newColors.ball.push(color);
     if (item.part_type === 'top') newColors.top.push(color);
@@ -82,8 +92,26 @@ export const fetchColorsFromSupabase = async (): Promise<PartsColors | null> => 
 
 export const addColorToSupabase = async (partType: string, name: string, hex: string) => {
   if (!supabase) return;
-  const { error } = await supabase.from('colors').insert([{ part_type: partType, name, hex }]);
+  // Use a default high position to put it at the end (or trigger a reorder logic later)
+  // For simplicity, we just insert.
+  const { error } = await supabase.from('colors').insert([{ part_type: partType, name, hex, position: 9999 }]);
   if (error) throw error;
+};
+
+export const updateColorPositions = async (colors: ColorOption[]) => {
+  if (!supabase) return;
+
+  // Simple sequential update. For huge lists this should be a stored procedure or upsert,
+  // but for 10-50 colors, this loop is acceptable.
+  for (let i = 0; i < colors.length; i++) {
+    const color = colors[i];
+    if (color.id) {
+      await supabase
+        .from('colors')
+        .update({ position: i })
+        .eq('id', color.id);
+    }
+  }
 };
 
 export const deleteColorFromSupabase = async (id: string) => {

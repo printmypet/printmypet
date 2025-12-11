@@ -3,6 +3,7 @@ export type ColorOption = {
   id?: string; // ID from Database
   name: string;
   hex: string;
+  position?: number;
 };
 
 export interface Texture {
