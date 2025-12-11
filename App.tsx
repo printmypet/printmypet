@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Cloud, Database, AlertCircle } from 'lucide-react';
-import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig } from './types';
+import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Database } from 'lucide-react';
+import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig, Texture } from './types';
 import { OrderForm } from './components/OrderForm';
 import { OrderList } from './components/OrderList';
 import { StatsDashboard } from './components/StatsDashboard';
@@ -16,7 +16,8 @@ import {
   updateOrderStatusInSupabase, 
   updateOrderPaidInSupabase, 
   deleteOrderFromSupabase,
-  fetchColorsFromSupabase
+  fetchColorsFromSupabase,
+  fetchTexturesFromSupabase
 } from './services/supabase';
 
 const App: React.FC = () => {
@@ -24,7 +25,6 @@ const App: React.FC = () => {
   const [view, setView] = useState<'list' | 'new' | 'admin'>('list');
   const [isOnline, setIsOnline] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [showSetupBanner, setShowSetupBanner] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); // Key to trigger re-init
 
   // Config State
@@ -40,9 +40,22 @@ const App: React.FC = () => {
     };
   });
 
-  const [availableTextures, setAvailableTextures] = useState<string[]>(() => {
-    const saved = localStorage.getItem('app-textures');
-    return saved ? JSON.parse(saved) : DEFAULT_TEXTURES;
+  const [availableTextures, setAvailableTextures] = useState<Texture[]>(() => {
+    const saved = localStorage.getItem('app-textures-v2');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    // Migration from old string[] format to Texture[] format
+    const oldSaved = localStorage.getItem('app-textures');
+    if (oldSaved) {
+      try {
+        const parsed = JSON.parse(oldSaved);
+        if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
+           return parsed.map(t => ({ id: uuidv4(), name: t }));
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_TEXTURES.map(t => ({ id: uuidv4(), name: t }));
   });
 
   // Init Supabase and Load Data
@@ -76,26 +89,23 @@ const App: React.FC = () => {
       setIsOnline(false);
     }
 
-    if (!connected && !localConfigStr) {
-      setShowSetupBanner(true);
-    } else {
-      setShowSetupBanner(false);
-    }
-
     if (connected) {
       // 1. Subscribe to Orders
       unsubscribe = subscribeToOrders((cloudOrders) => {
         setOrders(cloudOrders);
       });
 
-      // 2. Fetch Colors from DB (Replace local storage if successful)
+      // 2. Fetch Colors from DB
       fetchColorsFromSupabase().then(dbColors => {
-        if (dbColors) {
-          // Verify if there are any colors. If empty (fresh DB), maybe don't overwrite default local just yet?
-          // But usually we want the DB to be source of truth.
-          if (dbColors.base.length > 0 || dbColors.ball.length > 0) {
+        if (dbColors && (dbColors.base.length > 0 || dbColors.ball.length > 0)) {
             setPartsColors(dbColors);
-          }
+        }
+      });
+
+      // 3. Fetch Textures from DB
+      fetchTexturesFromSupabase().then(dbTextures => {
+        if (dbTextures && dbTextures.length > 0) {
+          setAvailableTextures(dbTextures);
         }
       });
 
@@ -142,18 +152,21 @@ const App: React.FC = () => {
   }, [partsColors]);
 
   useEffect(() => {
-    localStorage.setItem('app-textures', JSON.stringify(availableTextures));
+    localStorage.setItem('app-textures-v2', JSON.stringify(availableTextures));
   }, [availableTextures]);
 
   const handleConfigUpdate = () => {
     setReloadKey(prev => prev + 1);
   };
 
-  // Function to refresh colors specifically (called after admin edits)
-  const refreshColors = async () => {
+  // Function to refresh config specifically (called after admin edits)
+  const refreshConfig = async () => {
     if (isOnline) {
        const dbColors = await fetchColorsFromSupabase();
        if (dbColors) setPartsColors(dbColors);
+       
+       const dbTextures = await fetchTexturesFromSupabase();
+       if (dbTextures) setAvailableTextures(dbTextures);
     }
   };
 
@@ -229,24 +242,6 @@ const App: React.FC = () => {
          </div>
       </div>
 
-      {/* Setup Banner */}
-      {showSetupBanner && !isOnline && view !== 'admin' && (
-        <div className="bg-indigo-600 text-white px-4 py-3 shadow-md relative z-40">
-           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm font-medium">O sistema está rodando em modo offline. Conecte ao Supabase para sincronizar.</span>
-              </div>
-              <button 
-                onClick={() => setView('admin')} 
-                className="bg-white text-indigo-700 px-4 py-1.5 rounded-full text-xs font-bold hover:bg-indigo-50 transition-colors whitespace-nowrap"
-              >
-                Configurar Nuvem
-              </button>
-           </div>
-        </div>
-      )}
-
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -300,7 +295,8 @@ const App: React.FC = () => {
               onSave={handleSaveOrder} 
               onCancel={() => setView('list')} 
               partsColors={partsColors}
-              availableTextures={availableTextures}
+              // Map Texture objects to simple strings for the OrderForm dropdown
+              availableTextures={availableTextures.map(t => t.name)}
             />
           </div>
         )}
@@ -325,7 +321,7 @@ const App: React.FC = () => {
               onUpdatePartsColors={setPartsColors}
               onUpdateTextures={setAvailableTextures}
               onConfigUpdate={handleConfigUpdate}
-              onRefreshColors={refreshColors}
+              onRefreshColors={refreshConfig}
               isOnline={isOnline}
             />
           ) : (

@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseConfig, Order, Customer, PartsColors, ColorOption } from '../types';
+import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture } from '../types';
 
 let supabase: SupabaseClient | undefined;
 
@@ -89,6 +89,36 @@ export const addColorToSupabase = async (partType: string, name: string, hex: st
 export const deleteColorFromSupabase = async (id: string) => {
   if (!supabase) return;
   const { error } = await supabase.from('colors').delete().eq('id', id);
+  if (error) throw error;
+};
+
+// --- Textures Management ---
+
+export const fetchTexturesFromSupabase = async (): Promise<Texture[] | null> => {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.from('textures').select('*').order('created_at', { ascending: true });
+  
+  if (error || !data) {
+    console.error('Error fetching textures:', error);
+    return null;
+  }
+
+  return data.map((item: any) => ({
+    id: item.id,
+    name: item.name
+  }));
+};
+
+export const addTextureToSupabase = async (name: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('textures').insert([{ name }]);
+  if (error) throw error;
+};
+
+export const deleteTextureFromSupabase = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('textures').delete().eq('id', id);
   if (error) throw error;
 };
 

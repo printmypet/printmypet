@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
-import { PartsColors, SupabaseConfig } from '../types';
+import { PartsColors, SupabaseConfig, Texture } from '../types';
 import { Button } from './ui/Button';
-import { testConnection, addColorToSupabase, deleteColorFromSupabase } from '../services/supabase';
+import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase } from '../services/supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AdminSettingsProps {
   partsColors: PartsColors;
-  textures: string[];
+  textures: Texture[];
   onUpdatePartsColors: (colors: PartsColors) => void;
-  onUpdateTextures: (textures: string[]) => void;
+  onUpdateTextures: (textures: Texture[]) => void;
   onConfigUpdate: () => void;
   onRefreshColors?: () => void;
   isOnline: boolean;
@@ -33,6 +34,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [newColorHex, setNewColorHex] = useState('#000000');
   const [newTextureName, setNewTextureName] = useState('');
   const [isProcessingColor, setIsProcessingColor] = useState(false);
+  const [isProcessingTexture, setIsProcessingTexture] = useState(false);
 
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>({
     supabaseUrl: '',
@@ -136,28 +138,53 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     }
   };
 
-  const handleAddTexture = (e: React.FormEvent) => {
+  const handleAddTexture = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newTextureName) {
-      if (!textures.includes(newTextureName)) {
-        onUpdateTextures([...textures, newTextureName]);
-        setNewTextureName('');
-      } else {
+      const exists = textures.some(t => t.name.toLowerCase() === newTextureName.toLowerCase());
+      if (exists) {
         alert('Esta textura já existe!');
+        return;
+      }
+
+      setIsProcessingTexture(true);
+      try {
+        if (isOnline) {
+          await addTextureToSupabase(newTextureName);
+          if (onRefreshColors) await onRefreshColors();
+        } else {
+          // Fallback Offline
+          onUpdateTextures([...textures, { id: uuidv4(), name: newTextureName }]);
+        }
+        setNewTextureName('');
+      } catch (e) {
+         alert("Erro ao adicionar textura.");
+         console.error(e);
+      } finally {
+        setIsProcessingTexture(false);
       }
     }
   };
 
-  const handleDeleteTexture = (textureToDelete: string) => {
+  const handleDeleteTexture = async (texture: Texture) => {
     if (confirm('Tem certeza que deseja remover esta textura?')) {
-      onUpdateTextures(textures.filter(t => t !== textureToDelete));
+      try {
+        if (isOnline && texture.id) {
+           await deleteTextureFromSupabase(texture.id);
+           if (onRefreshColors) await onRefreshColors();
+        } else {
+           onUpdateTextures(textures.filter(t => t.name !== texture.name));
+        }
+      } catch (e) {
+         alert("Erro ao remover textura.");
+      }
     }
   };
 
   const copySql = () => {
     const sql = `
 -- 1. Tabela de Clientes
-CREATE TABLE public.customers (
+CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
   name text NOT NULL,
@@ -179,7 +206,7 @@ CREATE TABLE public.customers (
 );
 
 -- 2. Tabela de Cores
-CREATE TABLE public.colors (
+CREATE TABLE IF NOT EXISTS public.colors (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamptz DEFAULT now(),
   name text NOT NULL,
@@ -187,8 +214,15 @@ CREATE TABLE public.colors (
   part_type text NOT NULL -- 'base', 'ball', 'top'
 );
 
--- 3. Tabela de Pedidos
-CREATE TABLE public.orders (
+-- 3. Tabela de Texturas
+CREATE TABLE IF NOT EXISTS public.textures (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamptz DEFAULT now(),
+  name text NOT NULL UNIQUE
+);
+
+-- 4. Tabela de Pedidos
+CREATE TABLE IF NOT EXISTS public.orders (
   id uuid PRIMARY KEY, -- Mantemos ID gerado no front por enquanto
   created_at timestamptz DEFAULT now(),
   status text,
@@ -203,10 +237,16 @@ CREATE TABLE public.orders (
 -- Configurações de Segurança
 ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
 
 -- Realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+
+-- Inserir Texturas Padrão (Se não existirem)
+INSERT INTO public.textures (name) VALUES 
+('Liso'), ('Hexagonal'), ('Listrado'), ('Pontilhado'), ('Voronoi')
+ON CONFLICT (name) DO NOTHING;
     `;
     navigator.clipboard.writeText(sql.trim());
     alert("SQL Atualizado copiado para a área de transferência!");
@@ -339,63 +379,50 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
                 </div>
                 
                 <p className="text-sm text-slate-400 mb-4">
-                    Copie o SQL abaixo e rode no Supabase para criar as tabelas de Clientes e Cores separadas.
+                    Copie o SQL abaixo e rode no Supabase para criar as tabelas de Clientes, Cores e Texturas.
                 </p>
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
 {`-- 1. Clientes
-CREATE TABLE public.customers (
+CREATE TABLE IF NOT EXISTS public.customers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at timestamptz DEFAULT now(),
   name text NOT NULL,
   cpf text UNIQUE,
-  email text,
-  phone text,
-  type text,
-  partner_name text,
-  instagram text,
-  address_full text,
-  zip_code text,
-  street text,
-  number text,
-  complement text,
-  neighborhood text,
-  city text,
-  state text
+  -- ...campos restantes
+  created_at timestamptz DEFAULT now()
 );
 
 -- 2. Cores
-CREATE TABLE public.colors (
+CREATE TABLE IF NOT EXISTS public.colors (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at timestamptz DEFAULT now(),
   name text NOT NULL,
   hex text NOT NULL,
-  part_type text NOT NULL
+  part_type text NOT NULL,
+  created_at timestamptz DEFAULT now()
 );
 
--- 3. Pedidos (Atualizado)
-CREATE TABLE public.orders (
+-- 3. Texturas
+CREATE TABLE IF NOT EXISTS public.textures (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text NOT NULL UNIQUE,
+  created_at timestamptz DEFAULT now()
+);
+
+-- 4. Pedidos
+CREATE TABLE IF NOT EXISTS public.orders (
   id uuid PRIMARY KEY,
-  created_at timestamptz DEFAULT now(),
-  status text,
-  price numeric,
-  shipping_cost numeric,
-  is_paid boolean,
   products jsonb,
-  customer_id uuid REFERENCES public.customers(id)
+  customer_id uuid REFERENCES public.customers(id),
+  -- ...
 );
 
--- Configurações
-ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;`}
+-- (Copie o script completo clicando no botão ao lado)`}
                     </pre>
                     <button 
                         onClick={copySql}
                         className="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copiar SQL"
+                        title="Copiar SQL Completo"
                     >
                         <Copy className="w-4 h-4" />
                     </button>
@@ -503,13 +530,14 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;`}
           </div>
         </div>
 
-        {/* Texture Management (Keep Local for now as per prompt focus on Colors/Clients) */}
+        {/* Texture Management */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-4 bg-slate-50 border-b border-slate-200">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
             <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
               <Layers className="w-5 h-5 text-indigo-600" />
-              Catálogo de Texturas (Local)
+              Catálogo de Texturas
             </h3>
+            {isOnline && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full border border-emerald-200">Salvo na Nuvem</span>}
           </div>
           
           <div className="p-6 space-y-6">
@@ -525,20 +553,21 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;`}
                   required
                 />
               </div>
-              <Button type="submit" size="md">
-                <Plus className="w-4 h-4 mr-1" /> Adicionar
+              <Button type="submit" size="md" disabled={isProcessingTexture}>
+                 {isProcessingTexture ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />} 
+                 Adicionar
               </Button>
             </form>
 
             <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Texturas Cadastradas ({textures.length})</label>
               {textures.map((texture) => (
-                <div key={texture} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg hover:border-slate-300 transition-colors shadow-sm">
+                <div key={texture.name} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg hover:border-slate-300 transition-colors shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
                         <Layers className="w-4 h-4 text-slate-400" />
                     </div>
-                    <span className="block font-medium text-slate-900">{texture}</span>
+                    <span className="block font-medium text-slate-900">{texture.name}</span>
                   </div>
                   <button 
                     onClick={() => handleDeleteTexture(texture)}

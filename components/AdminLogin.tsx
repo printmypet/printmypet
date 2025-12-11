@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Lock, User, Key, Info } from 'lucide-react';
+import { Lock, User, Key } from 'lucide-react';
 import { Button } from './ui/Button';
 
 interface AdminLoginProps {
@@ -31,15 +32,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
           <p className="text-slate-500 text-sm mt-1 text-center">
             Esta área é restrita para gerenciamento de configurações e banco de dados.
           </p>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-6 text-sm text-blue-800 flex items-start gap-2">
-           <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-           <div>
-             <strong>Credenciais Padrão:</strong><br/>
-             Usuário: <code className="bg-blue-100 px-1 rounded">admin</code><br/>
-             Senha: <code className="bg-blue-100 px-1 rounded">passroot</code>
-           </div>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">

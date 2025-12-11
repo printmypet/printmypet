@@ -5,6 +5,11 @@ export type ColorOption = {
   hex: string;
 };
 
+export interface Texture {
+  id?: string;
+  name: string;
+}
+
 export const DEFAULT_COLORS: ColorOption[] = [
   { name: 'Branco', hex: '#FFFFFF' },
   { name: 'Preto', hex: '#1F2937' },
