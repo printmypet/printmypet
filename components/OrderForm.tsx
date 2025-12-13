@@ -505,10 +505,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <div>
                   <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Cores das Partes</h4>
                   <ColorPicker 
-                    label="Parte 1 (Base)" 
-                    options={partsColors.base}
-                    selected={currentProduct.part1Color} 
-                    onChange={(c) => handleProductChange('part1Color', c)} 
+                    label="Parte 3 (Detalhes/Topo)" 
+                    options={partsColors.top}
+                    selected={currentProduct.part3Color} 
+                    onChange={(c) => handleProductChange('part3Color', c)} 
                   />
                   <ColorPicker 
                     label="Parte 2 (Bola)" 
@@ -517,10 +517,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                     onChange={(c) => handleProductChange('part2Color', c)} 
                   />
                   <ColorPicker 
-                    label="Parte 3 (Detalhes/Topo)" 
-                    options={partsColors.top}
-                    selected={currentProduct.part3Color} 
-                    onChange={(c) => handleProductChange('part3Color', c)} 
+                    label="Parte 1 (Base)" 
+                    options={partsColors.base}
+                    selected={currentProduct.part1Color} 
+                    onChange={(c) => handleProductChange('part1Color', c)} 
                   />
                 </div>
 
