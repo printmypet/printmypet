@@ -292,51 +292,41 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
     if (name.includes('hexagonal')) {
       return (
-        <defs>
-          <pattern id="hex" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="scale(0.8)">
+        <pattern id="hex" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="scale(0.8)">
              <path d="M10 0 L18.66 5 L18.66 15 L10 20 L1.34 15 L1.34 5 Z" fill="none" stroke={color} strokeWidth="1" />
-          </pattern>
-        </defs>
+        </pattern>
       );
     } 
     else if (name.includes('listrado')) {
       return (
-        <defs>
-          <pattern id="stripes" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <pattern id="stripes" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
              <line x1="0" y1="0" x2="0" y2="10" stroke={color} strokeWidth="4" />
-          </pattern>
-        </defs>
+        </pattern>
       );
     }
     else if (name.includes('pontilhado')) {
       return (
-         <defs>
           <pattern id="dots" width="10" height="10" patternUnits="userSpaceOnUse">
              <circle cx="5" cy="5" r="2" fill={color} />
           </pattern>
-        </defs>
       );
     }
     else if (name.includes('voronoi')) {
       return (
-         <defs>
           <pattern id="voronoi" width="30" height="30" patternUnits="userSpaceOnUse">
              <path d="M0 0 L10 10 L25 5 L30 15 L20 25 L5 20 Z" fill="none" stroke={color} strokeWidth="1.5" />
              <path d="M30 0 L20 10 M10 30 L15 20" stroke={color} strokeWidth="1.5" />
           </pattern>
-        </defs>
       );
     }
     else {
       return (
-        <defs>
           <pattern id="paws" width="30" height="30" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <circle cx="10" cy="10" r="3" fill={color}/>
             <circle cx="6" cy="6" r="1.5" fill={color}/>
             <circle cx="14" cy="6" r="1.5" fill={color}/>
             <circle cx="10" cy="4" r="1.5" fill={color}/>
           </pattern>
-        </defs>
       );
     }
   };
@@ -368,17 +358,82 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   }) => {
     const [hasError, setHasError] = useState(false);
 
+    // --- SVG Replacement Logic for known parts to avoid 404s ---
+    
+    if (imageSrc.includes('base')) {
+        return (
+          <div className={`relative flex justify-center items-center ${className}`} style={{ zIndex }}>
+              <svg viewBox="0 0 200 100" className="w-full h-full drop-shadow-sm filter saturate-150">
+                  <defs>{texturePattern && getTexturePattern(texturePattern)}</defs>
+                  
+                  {/* Cylinder Body */}
+                  <path d="M20,20 L20,60 Q100,90 180,60 L180,20 Q100,50 20,20 Z" fill={color} />
+                  {/* Top Surface */}
+                  <ellipse cx="100" cy="20" rx="80" ry="15" fill={color} filter="brightness(1.1)"/>
+                  
+                  {/* Texture Overlay */}
+                  {texturePattern && (
+                      <path d="M20,20 L20,60 Q100,90 180,60 L180,20 Q100,50 20,20 Z" fill={getPatternId(texturePattern)} opacity="0.2" />
+                  )}
+              </svg>
+              {label && <span className="absolute text-[10px] font-bold text-slate-400/50 uppercase select-none bottom-0 translate-y-full">{label}</span>}
+          </div>
+        );
+    }
+
+    if (imageSrc.includes('ball')) {
+        return (
+          <div className={`relative flex justify-center items-center ${className}`} style={{ zIndex }}>
+              <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md">
+                  <defs>
+                      {texturePattern && getTexturePattern(texturePattern)}
+                      <radialGradient id="sphereGrad" cx="30%" cy="30%" r="70%">
+                          <stop offset="0%" stopColor="white" stopOpacity="0.4" />
+                          <stop offset="100%" stopColor="black" stopOpacity="0.2" />
+                      </radialGradient>
+                  </defs>
+                  <circle cx="50" cy="50" r="48" fill={color} />
+                  <circle cx="50" cy="50" r="48" fill="url(#sphereGrad)" />
+                  {texturePattern && <circle cx="50" cy="50" r="48" fill={getPatternId(texturePattern)} opacity="0.2" />}
+              </svg>
+              {label && <span className="absolute text-[10px] font-bold text-slate-400/50 uppercase select-none bottom-0 translate-y-full">{label}</span>}
+          </div>
+        );
+    }
+
+    if (imageSrc.includes('top')) {
+        return (
+          <div className={`relative flex justify-center items-center ${className}`} style={{ zIndex }}>
+              <svg viewBox="0 0 140 70" className="w-full h-full drop-shadow-sm">
+                  <defs>{texturePattern && getTexturePattern(texturePattern)}</defs>
+                  {/* Cap Shape */}
+                  <path d="M20,40 Q70,10 120,40 L120,50 Q70,80 20,50 Z" fill={color} />
+                  <path d="M20,40 Q70,10 120,40" fill="none" stroke="white" strokeWidth="2" opacity="0.3" />
+                  {texturePattern && <path d="M20,40 Q70,10 120,40 L120,50 Q70,80 20,50 Z" fill={getPatternId(texturePattern)} opacity="0.2" />}
+              </svg>
+              {label && <span className="absolute text-[10px] font-bold text-slate-400/50 uppercase select-none bottom-0 translate-y-full">{label}</span>}
+          </div>
+        );
+    }
+
+    // --- End SVG Replacement ---
+
+    // Fallback for custom images if added later
+    const resolvedSrc = (() => {
+        const cleanPath = imageSrc.startsWith('/') ? imageSrc.slice(1) : imageSrc;
+        return `./${cleanPath}`; 
+    })();
+
     return (
       <div className={`relative flex justify-center items-center ${className}`} style={{ zIndex }}>
         {!hasError ? (
           <>
-            {/* 1. Base Color Layer (Masked to shape) */}
             <div 
               className="absolute inset-0 w-full h-full bg-current transition-colors duration-300"
               style={{ 
                 backgroundColor: color,
-                maskImage: `url(${imageSrc})`,
-                WebkitMaskImage: `url(${imageSrc})`,
+                maskImage: `url(${resolvedSrc})`,
+                WebkitMaskImage: `url(${resolvedSrc})`,
                 maskSize: 'contain',
                 WebkitMaskSize: 'contain',
                 maskRepeat: 'no-repeat',
@@ -388,13 +443,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               }}
             />
 
-            {/* 2. Texture Overlay (If applicable) */}
             {texturePattern && texturePattern !== 'Liso' && (
               <div 
               className="absolute inset-0 w-full h-full opacity-30 pointer-events-none"
               style={{ 
-                maskImage: `url(${imageSrc})`,
-                WebkitMaskImage: `url(${imageSrc})`,
+                maskImage: `url(${resolvedSrc})`,
+                WebkitMaskImage: `url(${resolvedSrc})`,
                 maskSize: 'contain',
                 WebkitMaskSize: 'contain',
                 maskRepeat: 'no-repeat',
@@ -404,18 +458,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               }}
             >
                 <svg width="100%" height="100%">
-                  {getTexturePattern(texturePattern)}
+                  <defs>{getTexturePattern(texturePattern)}</defs>
                   <rect width="100%" height="100%" fill={getPatternId(texturePattern)} />
                 </svg>
             </div>
             )}
 
-            {/* 3. Shadow/Depth Overlay (The original image blended) */}
             <img 
-              src={imageSrc} 
+              src={resolvedSrc} 
               alt="Part" 
               className="relative w-full h-full object-contain mix-blend-multiply opacity-80 pointer-events-none" 
-              onError={() => setHasError(true)}
+              onError={(e) => {
+                 setHasError(true);
+              }}
             />
           </>
         ) : (
@@ -425,7 +480,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           </div>
         )}
         
-        {/* Label */}
         {label && <span className="absolute text-[10px] font-bold text-slate-400/50 uppercase select-none bottom-0 translate-y-full">{label}</span>}
       </div>
     );
@@ -677,9 +731,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <div className="mt-12 flex flex-col gap-1 items-center">
                   <p className="text-xs text-slate-400 text-center max-w-xs">
                     * Simulação visual com base nas cores selecionadas.
-                  </p>
-                  <p className="text-[10px] text-slate-300 text-center">
-                    Certifique-se que os arquivos top.png, ball.png e base.png estão na pasta pública.
                   </p>
                 </div>
               </div>
