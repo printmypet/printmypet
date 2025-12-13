@@ -73,46 +73,54 @@ const App: React.FC = () => {
   // Init Supabase and Load Data
   useEffect(() => {
     let configToUse: SupabaseConfig | null = null;
-    let isTesting = false;
+    
+    // 1. Identificar Modo (Teste ou Produção)
+    const envMode = localStorage.getItem('app-env-mode') || 'prod';
+    const isTesting = envMode === 'test';
+    setIsTestMode(isTesting);
 
-    // 1. VERIFICAÇÃO FORÇADA DA CONFIGURAÇÃO FIXA
-    if (FIXED_CONFIG.url && FIXED_CONFIG.key && FIXED_CONFIG.url.includes('http')) {
-        console.log("App: Usando CREDENCIAIS FIXAS do código.");
-        configToUse = {
-            supabaseUrl: FIXED_CONFIG.url,
-            supabaseKey: FIXED_CONFIG.key
-        };
-        
-        // Força modo produção
-        localStorage.setItem('app-env-mode', 'prod');
-        
-        const currentStored = localStorage.getItem('app-supabase-config');
-        const configString = JSON.stringify(configToUse);
-        if (currentStored !== configString) {
-           localStorage.setItem('app-supabase-config', configString);
-        }
-
-        isTesting = false;
-    } else {
-        const envMode = localStorage.getItem('app-env-mode') || 'prod';
-        isTesting = envMode === 'test';
-        
-        const configKey = isTesting ? 'app-supabase-config-test' : 'app-supabase-config';
-        const localConfigStr = localStorage.getItem(configKey);
-
-        if (localConfigStr) {
+    if (isTesting) {
+        // MODO TESTE: Ignora Fixed Config e busca do LocalStorage
+        console.log("App: Inicializando em modo de TESTE.");
+        const testConfigStr = localStorage.getItem('app-supabase-config-test');
+        if (testConfigStr) {
             try {
-                const parsed = JSON.parse(localConfigStr);
-                if (parsed && parsed.supabaseUrl && parsed.supabaseKey) {
-                    configToUse = parsed;
-                }
+                configToUse = JSON.parse(testConfigStr);
             } catch (e) {
-                console.warn("Config local inválida");
+                console.warn("Configuração de teste inválida.");
+            }
+        }
+    } else {
+        // MODO PRODUÇÃO
+        // Verifica se tem Config Fixa no código primeiro
+        if (FIXED_CONFIG.url && FIXED_CONFIG.key && FIXED_CONFIG.url.includes('http')) {
+            console.log("App: Usando CREDENCIAIS FIXAS (Produção).");
+            configToUse = {
+                supabaseUrl: FIXED_CONFIG.url,
+                supabaseKey: FIXED_CONFIG.key
+            };
+            
+            // Salva no localStorage apenas para persistência visual no form de admin
+            const currentStored = localStorage.getItem('app-supabase-config');
+            const configString = JSON.stringify(configToUse);
+            if (currentStored !== configString) {
+               localStorage.setItem('app-supabase-config', configString);
+            }
+        } else {
+            // Se não tiver fixa, busca do LocalStorage (Produção manual)
+            const localConfigStr = localStorage.getItem('app-supabase-config');
+            if (localConfigStr) {
+                try {
+                    const parsed = JSON.parse(localConfigStr);
+                    if (parsed && parsed.supabaseUrl && parsed.supabaseKey) {
+                        configToUse = parsed;
+                    }
+                } catch (e) {
+                    console.warn("Config local inválida");
+                }
             }
         }
     }
-
-    setIsTestMode(isTesting);
 
     // 2. TENTATIVA DE CONEXÃO
     let connected = false;
@@ -123,23 +131,20 @@ const App: React.FC = () => {
       connected = initSupabase(configToUse);
       
       if (connected) {
-          console.log("App: Conexão inicializada com sucesso.");
+          console.log(`App: Conexão inicializada (${isTesting ? 'Teste' : 'Produção'}).`);
           setIsOnline(true);
       } else {
           console.error("App: Falha ao inicializar Supabase. Verifique URL/Key.");
           setIsOnline(false);
       }
     } else {
-      console.warn("App: Nenhuma configuração disponível.");
+      console.warn("App: Nenhuma configuração disponível para o modo selecionado.");
       setIsOnline(false);
     }
 
     if (connected) {
       // Subscribe to Orders
       unsubscribe = subscribeToOrders((cloudOrders) => {
-        // Only update if data is different/newer to avoid overwriting optimistic updates unnecessarily
-        // For simplicity in this structure, we just accept the cloud state.
-        // Optimistic updates will temporarily override UI, then this callback confirms it.
         setOrders(cloudOrders);
       });
 
