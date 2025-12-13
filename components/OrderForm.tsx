@@ -676,7 +676,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                     imageSrc="base.png"
                     color={currentProduct.part1Color}
                     zIndex={10}
-                    className="w-64 h-20"
+                    className="w-76 h-24"
                     label="BASE"
                   />
                 </div>
