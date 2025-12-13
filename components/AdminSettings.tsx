@@ -461,7 +461,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sqlParts = [
-      "-- SCRIPT COMPLETO (v15 - Inclui Usuário Admin)",
+      "-- SCRIPT COMPLETO (v16 - CORREÇÃO DE ERRO 42710)",
       "-- 1. Tabelas de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;",
@@ -499,23 +499,36 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "-- 6. Tabela de Estoque de Filamentos",
       "CREATE TABLE IF NOT EXISTS public.filaments (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), brand text NOT NULL, material text NOT NULL, color_name text NOT NULL, color_hex text DEFAULT '#000000', rating text NOT NULL, quantity numeric DEFAULT 0);",
 
-      "-- 7. Segurança RLS (Permissiva)",
+      "-- 7. Segurança RLS (Limpeza e Recriação)",
+      
+      "-- Orders",
       "ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Orders\" ON public.orders;",
       "CREATE POLICY \"Public Access Orders\" ON public.orders FOR ALL USING (true) WITH CHECK (true);",
 
+      "-- Customers",
       "ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Customers\" ON public.customers;",
       "CREATE POLICY \"Public Access Customers\" ON public.customers FOR ALL USING (true) WITH CHECK (true);",
 
+      "-- Colors",
       "ALTER TABLE public.colors ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Colors\" ON public.colors;",
       "CREATE POLICY \"Public Access Colors\" ON public.colors FOR ALL USING (true) WITH CHECK (true);",
 
+      "-- Textures",
       "ALTER TABLE public.textures ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Textures\" ON public.textures;",
       "CREATE POLICY \"Public Access Textures\" ON public.textures FOR ALL USING (true) WITH CHECK (true);",
 
+      "-- Users",
       "ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Users\" ON public.app_users;",
       "CREATE POLICY \"Public Access Users\" ON public.app_users FOR ALL USING (true) WITH CHECK (true);",
 
+      "-- Filaments",
       "ALTER TABLE public.filaments ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Filaments\" ON public.filaments;",
       "CREATE POLICY \"Public Access Filaments\" ON public.filaments FOR ALL USING (true) WITH CHECK (true);",
       
       "-- 8. INSERIR ADMIN PADRÃO (Se não existir)",
@@ -523,7 +536,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     ];
     
     navigator.clipboard.writeText(sqlParts.join('\n'));
-    alert("SQL Completo copiado! Cole no SQL Editor do Supabase.");
+    alert("SQL Completo (v16) copiado! Cole no SQL Editor do Supabase.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = { base: 'Base', ball: 'Bola', top: 'Tampa/Topo' };
@@ -1243,11 +1256,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- SCRIPT COMPLETO (v15)
+{`-- SCRIPT COMPLETO (v16)
 -- (Clique no botão copiar para ver tudo)
 CREATE TABLE IF NOT EXISTS public.customers (...);
 -- RLS Habilitado e USER ADMIN CRIADO
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access Orders" ON public.orders;
 CREATE POLICY "Public Access Orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
 INSERT INTO public.app_users (username, password, role) SELECT 'admin', 'passroot', 'admin' WHERE...;
 `}
