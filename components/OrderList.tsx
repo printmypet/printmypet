@@ -73,6 +73,24 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
      onUpdateProducts(order.id, newProducts);
   };
 
+  // Helper para decidir cor do ícone (Preto ou Branco) baseado no fundo
+  const getCheckColorClass = (hexColor: string) => {
+    try {
+      const hex = hexColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      
+      // Fórmula de brilho (YIQ)
+      const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+      
+      // Se for maior que 128, a cor é clara, então retornamos texto escuro
+      return yiq >= 150 ? 'text-slate-900' : 'text-white';
+    } catch (e) {
+      return 'text-white';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
@@ -246,31 +264,31 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                                             {/* Part 1 */}
                                             <div 
                                                 onClick={() => handleTogglePartStatus(order, idx, 'part1')}
-                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
+                                                className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
                                                 style={{backgroundColor: product.part1Color}} 
                                                 title="Base (Clique para confirmar)"
                                             >
-                                                {pStatus.part1 && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
+                                                {pStatus.part1 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part1Color)}`} />}
                                             </div>
 
                                             {/* Part 2 */}
                                             <div 
                                                 onClick={() => handleTogglePartStatus(order, idx, 'part2')}
-                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
+                                                className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
                                                 style={{backgroundColor: product.part2Color}} 
                                                 title="Bola (Clique para confirmar)"
                                             >
-                                                {pStatus.part2 && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
+                                                {pStatus.part2 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part2Color)}`} />}
                                             </div>
 
                                             {/* Part 3 */}
                                             <div 
                                                 onClick={() => handleTogglePartStatus(order, idx, 'part3')}
-                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
+                                                className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
                                                 style={{backgroundColor: product.part3Color}} 
                                                 title="Topo (Clique para confirmar)"
                                             >
-                                                {pStatus.part3 && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
+                                                {pStatus.part3 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part3Color)}`} />}
                                             </div>
                                         </div>
                                     </div>
