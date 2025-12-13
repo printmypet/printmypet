@@ -366,14 +366,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               <svg viewBox="0 0 200 100" className="w-full h-full drop-shadow-sm filter saturate-150">
                   <defs>{texturePattern && getTexturePattern(texturePattern)}</defs>
                   
-                  {/* Cylinder Body */}
-                  <path d="M20,20 L20,60 Q100,90 180,60 L180,20 Q100,50 20,20 Z" fill={color} />
-                  {/* Top Surface */}
-                  <ellipse cx="100" cy="20" rx="80" ry="15" fill={color} filter="brightness(1.1)"/>
+                  {/* Cylinder Body (Widened from 20 to 10 on sides for beefier look) */}
+                  <path d="M10,20 L10,60 Q100,90 190,60 L190,20 Q100,50 10,20 Z" fill={color} />
+                  {/* Top Surface (Widened ellipse) */}
+                  <ellipse cx="100" cy="20" rx="90" ry="15" fill={color} filter="brightness(1.1)"/>
                   
                   {/* Texture Overlay */}
                   {texturePattern && (
-                      <path d="M20,20 L20,60 Q100,90 180,60 L180,20 Q100,50 20,20 Z" fill={getPatternId(texturePattern)} opacity="0.2" />
+                      <path d="M10,20 L10,60 Q100,90 190,60 L190,20 Q100,50 10,20 Z" fill={getPatternId(texturePattern)} opacity="0.2" />
                   )}
               </svg>
               {label && <span className="absolute text-[10px] font-bold text-slate-400/50 uppercase select-none bottom-0 translate-y-full">{label}</span>}
@@ -714,7 +714,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                     imageSrc="ball.png"
                     color={currentProduct.part2Color}
                     zIndex={20}
-                    className="w-24 h-24 mb-[-18px]" 
+                    className="w-20 h-20 mb-[-15px]" 
                     label="BOLA"
                   />
 
@@ -723,7 +723,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                     imageSrc="base.png"
                     color={currentProduct.part1Color}
                     zIndex={10}
-                    className="w-60 h-20"
+                    className="w-72 h-24"
                     label="BASE"
                   />
                 </div>
