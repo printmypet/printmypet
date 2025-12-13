@@ -660,7 +660,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                     imageSrc="ball.png"
                     color={currentProduct.part2Color}
                     zIndex={20}
-                    className="w-28 h-28 mb-[-18px]"
+                    className="w-24 h-24 mb-[-18px]" 
                     label="BOLA"
                   />
 
@@ -669,7 +669,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                     imageSrc="base.png"
                     color={currentProduct.part1Color}
                     zIndex={10}
-                    className="w-48 h-16"
+                    className="w-60 h-20"
                     label="BASE"
                   />
                 </div>
