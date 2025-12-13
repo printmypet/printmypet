@@ -22,8 +22,9 @@ import {
   updateOrderProducts
 } from './services/supabase';
 
-// --- CONFIGURAÇÃO FIXA (HARDCODED) ---
-// SE ESTAS CHAVES ESTIVEREM AQUI, ELAS SERÃO USADAS AUTOMATICAMENTE PARA PRODUÇÃO.
+// --- CONFIGURAÇÃO FIXA ---
+// IMPORTANTE: Se você estiver usando o modo de TESTE, esta configuração será IGNORADA.
+// Ela serve apenas como fallback para produção.
 const FIXED_CONFIG = {
   url: "https://ptymvjqnsxdllljqaeqz.supabase.co",
   key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0eW12anFuc3hkbGxsanFhZXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzOTk5NjgsImV4cCI6MjA4MDk3NTk2OH0.N6To6n4hKRBFAtQKq1XUahR-LEDyfenekBiI_GoLkDk"
@@ -38,7 +39,12 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); 
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const [isTestMode, setIsTestMode] = useState(false);
+  
+  // Inicialização PREGUIÇOSA (Lazy) para garantir que o estado comece correto
+  const [isTestMode, setIsTestMode] = useState(() => {
+     const savedMode = localStorage.getItem('app-env-mode');
+     return savedMode === 'test';
+  });
 
   // Config State
   const [partsColors, setPartsColors] = useState<PartsColors>(() => {
@@ -74,71 +80,67 @@ const App: React.FC = () => {
   useEffect(() => {
     let configToUse: SupabaseConfig | null = null;
     
-    // 1. Identificar Modo (Teste ou Produção)
+    // Ler o modo novamente para garantir
     const envMode = localStorage.getItem('app-env-mode') || 'prod';
-    const isTesting = envMode === 'test';
-    setIsTestMode(isTesting);
+    const currentIsTest = envMode === 'test';
+    
+    console.log(`App: Inicializando. Modo: ${envMode.toUpperCase()}`);
 
-    if (isTesting) {
-        // MODO TESTE: Ignora Fixed Config e busca do LocalStorage
-        console.log("App: Inicializando em modo de TESTE.");
+    if (currentIsTest) {
+        // --- MODO TESTE ---
+        // Busca APENAS do LocalStorage. Ignora FIXED_CONFIG.
         const testConfigStr = localStorage.getItem('app-supabase-config-test');
         if (testConfigStr) {
             try {
                 configToUse = JSON.parse(testConfigStr);
+                console.log("App: Usando configuração de TESTE salva.");
             } catch (e) {
-                console.warn("Configuração de teste inválida.");
+                console.warn("App: Configuração de teste inválida (JSON error).");
             }
+        } else {
+            console.warn("App: Modo TESTE ativo, mas nenhuma configuração encontrada em 'app-supabase-config-test'.");
         }
     } else {
-        // MODO PRODUÇÃO
-        // Verifica se tem Config Fixa no código primeiro
-        if (FIXED_CONFIG.url && FIXED_CONFIG.key && FIXED_CONFIG.url.includes('http')) {
-            console.log("App: Usando CREDENCIAIS FIXAS (Produção).");
+        // --- MODO PRODUÇÃO ---
+        // Prioridade 1: Configuração salva manualmente no LocalStorage
+        const localConfigStr = localStorage.getItem('app-supabase-config');
+        if (localConfigStr) {
+            try {
+                const parsed = JSON.parse(localConfigStr);
+                if (parsed && parsed.supabaseUrl && parsed.supabaseKey) {
+                    configToUse = parsed;
+                    console.log("App: Usando configuração de PRODUÇÃO manual.");
+                }
+            } catch (e) {}
+        }
+
+        // Prioridade 2: Fallback para FIXED_CONFIG se não houver manual
+        if (!configToUse && FIXED_CONFIG.url && FIXED_CONFIG.key) {
+            console.log("App: Usando configuração de PRODUÇÃO FIXA (Fallback).");
             configToUse = {
                 supabaseUrl: FIXED_CONFIG.url,
                 supabaseKey: FIXED_CONFIG.key
             };
-            
-            // Salva no localStorage apenas para persistência visual no form de admin
-            const currentStored = localStorage.getItem('app-supabase-config');
-            const configString = JSON.stringify(configToUse);
-            if (currentStored !== configString) {
-               localStorage.setItem('app-supabase-config', configString);
-            }
-        } else {
-            // Se não tiver fixa, busca do LocalStorage (Produção manual)
-            const localConfigStr = localStorage.getItem('app-supabase-config');
-            if (localConfigStr) {
-                try {
-                    const parsed = JSON.parse(localConfigStr);
-                    if (parsed && parsed.supabaseUrl && parsed.supabaseKey) {
-                        configToUse = parsed;
-                    }
-                } catch (e) {
-                    console.warn("Config local inválida");
-                }
-            }
+            // Salva para persistência visual
+            localStorage.setItem('app-supabase-config', JSON.stringify(configToUse));
         }
     }
 
-    // 2. TENTATIVA DE CONEXÃO
+    // TENTATIVA DE CONEXÃO
     let connected = false;
     let unsubscribe = () => {};
 
     if (configToUse) {
-      // Tenta inicializar
       connected = initSupabase(configToUse);
-      
       if (connected) {
-          console.log(`App: Conexão inicializada (${isTesting ? 'Teste' : 'Produção'}).`);
+          console.log("App: Supabase conectado com sucesso.");
           setIsOnline(true);
       } else {
-          console.error("App: Falha ao inicializar Supabase. Verifique URL/Key.");
+          console.error("App: Falha na conexão com Supabase.");
           setIsOnline(false);
       }
     } else {
-      console.warn("App: Nenhuma configuração disponível para o modo selecionado.");
+      console.warn("App: Sem configuração válida para conectar.");
       setIsOnline(false);
     }
 
@@ -164,7 +166,7 @@ const App: React.FC = () => {
 
     } else {
       // Fallback to Local Storage (Offline Mode)
-      console.log("App: Entrando em modo Offline (Local Storage).");
+      console.log("App: Carregando dados offline.");
       const savedOrders = localStorage.getItem('3d-print-orders');
       if (savedOrders) {
         try {
@@ -231,7 +233,6 @@ const App: React.FC = () => {
           await updateOrderInSupabase(updatedOrder);
         } catch (e: any) {
           alert(`Erro ao atualizar: ${e.message}`);
-          // Revert or refresh could be added here
           return;
         }
       } else {
@@ -282,42 +283,18 @@ const App: React.FC = () => {
   };
 
   const handleUpdateStatus = async (id: string, status: OrderStatus) => {
-    // Optimistic Update
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-
-    if (isOnline) {
-      try {
-        await updateOrderStatusInSupabase(id, status);
-      } catch(e) {
-        console.error("Error updating status", e);
-      }
-    }
+    if (isOnline) await updateOrderStatusInSupabase(id, status);
   };
 
   const handleUpdatePaid = async (id: string, isPaid: boolean) => {
-    // Optimistic Update
     setOrders(prev => prev.map(o => o.id === id ? { ...o, isPaid } : o));
-
-    if (isOnline) {
-      try {
-        await updateOrderPaidInSupabase(id, isPaid);
-      } catch(e) {
-        console.error("Error updating paid", e);
-      }
-    }
+    if (isOnline) await updateOrderPaidInSupabase(id, isPaid);
   };
 
   const handleUpdateProducts = async (id: string, products: ProductConfig[]) => {
-    // Optimistic Update (CRITICAL for the build parts toggle)
     setOrders(prev => prev.map(o => o.id === id ? { ...o, products } : o));
-
-    if (isOnline) {
-      try {
-        await updateOrderProducts(id, products);
-      } catch (e) {
-        console.error("Error updating products", e);
-      }
-    }
+    if (isOnline) await updateOrderProducts(id, products);
   };
 
   const handleEditClick = (order: Order) => {

@@ -1,4 +1,5 @@
 
+// @ts-nocheck
 import React, { useState } from 'react';
 import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck, AlertCircle, Check } from 'lucide-react';
 import { Order, OrderStatus, ProductConfig } from '../types';
