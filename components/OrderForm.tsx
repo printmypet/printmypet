@@ -350,9 +350,76 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     return 'url(#paws)';
   };
 
+  // Helper for rendering a 3D part with dynamic color
+  const PartRenderer = ({ 
+    imageSrc, 
+    color, 
+    zIndex, 
+    className, 
+    texturePattern = null,
+    label 
+  }: { 
+    imageSrc: string, 
+    color: string, 
+    zIndex: number, 
+    className?: string, 
+    texturePattern?: string | null,
+    label?: string
+  }) => (
+    <div className={`relative flex justify-center items-center ${className}`} style={{ zIndex }}>
+      {/* 1. Base Color Layer (Masked to shape) */}
+      <div 
+        className="absolute inset-0 w-full h-full bg-current transition-colors duration-300"
+        style={{ 
+          backgroundColor: color,
+          maskImage: `url(${imageSrc})`,
+          WebkitMaskImage: `url(${imageSrc})`,
+          maskSize: 'contain',
+          WebkitMaskSize: 'contain',
+          maskRepeat: 'no-repeat',
+          WebkitMaskRepeat: 'no-repeat',
+          maskPosition: 'center',
+          WebkitMaskPosition: 'center'
+        }}
+      />
+
+      {/* 2. Texture Overlay (If applicable) */}
+      {texturePattern && texturePattern !== 'Liso' && (
+         <div 
+         className="absolute inset-0 w-full h-full opacity-30 pointer-events-none"
+         style={{ 
+           maskImage: `url(${imageSrc})`,
+           WebkitMaskImage: `url(${imageSrc})`,
+           maskSize: 'contain',
+           WebkitMaskSize: 'contain',
+           maskRepeat: 'no-repeat',
+           WebkitMaskRepeat: 'no-repeat',
+           maskPosition: 'center',
+           WebkitMaskPosition: 'center'
+         }}
+       >
+           <svg width="100%" height="100%">
+             {getTexturePattern(texturePattern)}
+             <rect width="100%" height="100%" fill={getPatternId(texturePattern)} />
+           </svg>
+       </div>
+      )}
+
+      {/* 3. Shadow/Depth Overlay (The original image blended) */}
+      <img 
+        src={imageSrc} 
+        alt="Part" 
+        className="relative w-full h-full object-contain mix-blend-multiply opacity-80 pointer-events-none" 
+      />
+      
+      {/* Label */}
+      {label && <span className="absolute text-[10px] font-bold text-slate-400/50 uppercase select-none bottom-0 translate-y-full">{label}</span>}
+    </div>
+  );
+
   return (
     <form onSubmit={handleSubmit} className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="border-b border-slate-200 bg-slate-50 px-6 py-4 flex items-center justify-between">
+      <div className="border-b border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
           {step === 1 ? <Box className="w-5 h-5 text-indigo-600"/> : <User className="w-5 h-5 text-indigo-600"/>}
           {step === 1 ? 'Configuração do Produto' : 'Dados do Cliente e Pagamento'}
@@ -560,62 +627,45 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               </div>
 
               {/* Visualizer */}
-              <div className="bg-slate-100 rounded-xl p-8 flex flex-col items-center justify-start border border-slate-200 sticky top-4 h-fit">
+              <div className="bg-white rounded-xl p-8 flex flex-col items-center justify-start border border-slate-200 sticky top-4 h-fit min-h-[400px]">
                 <h4 className="text-slate-500 font-medium mb-12 uppercase tracking-wider text-sm">Visualização do Item Atual</h4>
                 <div className="relative flex flex-col items-center">
                   
-                  {/* Part 3 (Top) */}
-                  <div 
-                    className="w-40 h-24 relative z-30 mb-[-16px] transition-colors duration-300 flex items-center justify-center shadow-lg"
-                    style={{ 
-                      backgroundColor: currentProduct.part3Color,
-                      clipPath: 'polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)',
-                      borderRadius: '0 0 10px 10px'
-                    }}
-                  >
-                    {(currentProduct.textureValue && currentProduct.textureValue !== 'Liso') && (
-                      <div className="absolute inset-0 opacity-30 pointer-events-none overflow-hidden">
-                        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                          {getTexturePattern(currentProduct.textureValue)}
-                          <rect width="100%" height="100%" fill={getPatternId(currentProduct.textureValue)} />
-                        </svg>
-                      </div>
-                    )}
-                    
-                    <span className="relative z-40 text-black font-bold text-sm tracking-wider uppercase drop-shadow-sm">TAMPA</span>
-
-                    <div className="absolute -right-36 top-0 bg-slate-800 text-white text-xs p-2 rounded opacity-0 hover:opacity-100 transition-opacity w-32 pointer-events-none z-50">
-                      Textura: {currentProduct.textureValue || "Nenhuma"}
-                    </div>
-                  </div>
+                  {/* Part 3 (Top) - Image Based */}
+                  <PartRenderer 
+                    imageSrc="top.png"
+                    color={currentProduct.part3Color}
+                    zIndex={30}
+                    className="w-40 h-24 mb-[-12px]"
+                    texturePattern={currentProduct.textureValue}
+                    label="TAMPA"
+                  />
                   
-                  {/* Part 2 (Middle) */}
-                  <div 
-                    className="w-24 h-24 rounded-full shadow-inner relative z-20 mb-[-20px] transition-colors duration-300 flex items-center justify-center border border-black/5"
-                    style={{ backgroundColor: currentProduct.part2Color }}
-                  >
-                    <div className="absolute inset-0 rounded-full opacity-20 pointer-events-none" style={{
-                      backgroundImage: 'radial-gradient(circle at center, rgba(0,0,0,0.6) 1px, transparent 1.5px)',
-                      backgroundSize: '8px 8px',
-                      backgroundPosition: '0 0'
-                    }}></div>
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-black/20 to-white/30 pointer-events-none"></div>
-                    <span className="text-white/80 text-[10px] font-bold uppercase mix-blend-overlay relative z-10">Bola</span>
-                  </div>
+                  {/* Part 2 (Ball) - Image Based */}
+                  <PartRenderer 
+                    imageSrc="ball.png"
+                    color={currentProduct.part2Color}
+                    zIndex={20}
+                    className="w-28 h-28 mb-[-18px]"
+                    label="BOLA"
+                  />
 
-                  {/* Part 1 (Base) */}
-                  <div 
-                    className="w-48 h-14 rounded-[50%] z-10 flex items-center justify-center transition-colors duration-300 relative shadow-xl border-b-4 border-black/10"
-                    style={{ backgroundColor: currentProduct.part1Color }}
-                  >
-                    <div className="absolute inset-2 rounded-[50%] border-2 border-white/20"></div>
-                    <span className="text-black font-bold text-sm uppercase relative z-20">BASE</span>
-                  </div>
+                  {/* Part 1 (Base) - Image Based */}
+                  <PartRenderer 
+                    imageSrc="base.png"
+                    color={currentProduct.part1Color}
+                    zIndex={10}
+                    className="w-48 h-16"
+                    label="BASE"
+                  />
                 </div>
                 
                 <div className="mt-12 flex flex-col gap-1 items-center">
-                   <p className="text-xs text-slate-400 text-center max-w-xs">
-                    * Representação esquemática.
+                  <p className="text-xs text-slate-400 text-center max-w-xs">
+                    * Simulação visual com base nas cores selecionadas.
+                  </p>
+                  <p className="text-[10px] text-slate-300 text-center">
+                    Certifique-se que os arquivos top.png, ball.png e base.png estão na pasta pública.
                   </p>
                 </div>
               </div>
