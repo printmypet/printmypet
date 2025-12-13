@@ -461,8 +461,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sqlParts = [
-      "-- SCRIPT COMPLETO (v14 - RLS Habilitado e Permissivo)",
-      "-- Tabelas de Clientes",
+      "-- SCRIPT COMPLETO (v15 - Inclui Usuário Admin)",
+      "-- 1. Tabelas de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS type text DEFAULT 'final';",
@@ -480,28 +480,26 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS state text;",
       "CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL AND cpf != '';",
       
-      "-- Tabela de Cores",
+      "-- 2. Tabela de Cores",
       "CREATE TABLE IF NOT EXISTS public.colors (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, name text NOT NULL, hex text NOT NULL, part_type text NOT NULL, position integer DEFAULT 999);",
       "ALTER TABLE public.colors ADD COLUMN IF NOT EXISTS position integer DEFAULT 999;",
 
-      "-- Tabela de Texturas",
+      "-- 3. Tabela de Texturas",
       "CREATE TABLE IF NOT EXISTS public.textures (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, name text NOT NULL UNIQUE);",
       
-      "-- Tabela de Pedidos",
+      "-- 4. Tabela de Pedidos",
       "CREATE TABLE IF NOT EXISTS public.orders (id uuid PRIMARY KEY, status text, price numeric, shipping_cost numeric, is_paid boolean, products jsonb, customer jsonb, customer_id uuid REFERENCES public.customers(id));",
       "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();",
       "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric DEFAULT 0;",
       "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean DEFAULT false;",
       
-      "-- Tabela de Usuários do App (Admin/User)",
+      "-- 5. Tabela de Usuários do App (Admin/User)",
       "CREATE TABLE IF NOT EXISTS public.app_users (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, username text NOT NULL UNIQUE, password text NOT NULL, role text DEFAULT 'user');",
       
-      "-- Tabela de Estoque de Filamentos",
+      "-- 6. Tabela de Estoque de Filamentos",
       "CREATE TABLE IF NOT EXISTS public.filaments (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), brand text NOT NULL, material text NOT NULL, color_name text NOT NULL, color_hex text DEFAULT '#000000', rating text NOT NULL, quantity numeric DEFAULT 0);",
 
-      "-- Segurança RLS (Habilitada para satisfazer Supabase, mas com Policies públicas para API Anônima)",
-      "-- Se Policies já existirem, os comandos abaixo podem gerar erro. Ignore se já estiver configurado.",
-      
+      "-- 7. Segurança RLS (Permissiva)",
       "ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;",
       "CREATE POLICY \"Public Access Orders\" ON public.orders FOR ALL USING (true) WITH CHECK (true);",
 
@@ -518,7 +516,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "CREATE POLICY \"Public Access Users\" ON public.app_users FOR ALL USING (true) WITH CHECK (true);",
 
       "ALTER TABLE public.filaments ENABLE ROW LEVEL SECURITY;",
-      "CREATE POLICY \"Public Access Filaments\" ON public.filaments FOR ALL USING (true) WITH CHECK (true);"
+      "CREATE POLICY \"Public Access Filaments\" ON public.filaments FOR ALL USING (true) WITH CHECK (true);",
+      
+      "-- 8. INSERIR ADMIN PADRÃO (Se não existir)",
+      "INSERT INTO public.app_users (name, username, password, role) SELECT 'Administrador', 'admin', 'passroot', 'admin' WHERE NOT EXISTS (SELECT 1 FROM public.app_users WHERE username = 'admin');"
     ];
     
     navigator.clipboard.writeText(sqlParts.join('\n'));
@@ -1242,12 +1243,13 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- SCRIPT COMPLETO (v14)
+{`-- SCRIPT COMPLETO (v15)
 -- (Clique no botão copiar para ver tudo)
 CREATE TABLE IF NOT EXISTS public.customers (...);
--- RLS Habilitado com policies públicas
+-- RLS Habilitado e USER ADMIN CRIADO
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Access Orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
+INSERT INTO public.app_users (username, password, role) SELECT 'admin', 'passroot', 'admin' WHERE...;
 `}
                     </pre>
                     <button 

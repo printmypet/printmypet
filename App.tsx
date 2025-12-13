@@ -76,7 +76,6 @@ const App: React.FC = () => {
     let isTesting = false;
 
     // 1. VERIFICAÇÃO FORÇADA DA CONFIGURAÇÃO FIXA
-    // Se existir configuração fixa no código, usamos ela e ignoramos o resto.
     if (FIXED_CONFIG.url && FIXED_CONFIG.key && FIXED_CONFIG.url.includes('http')) {
         console.log("App: Usando CREDENCIAIS FIXAS do código.");
         configToUse = {
@@ -87,8 +86,6 @@ const App: React.FC = () => {
         // Força modo produção
         localStorage.setItem('app-env-mode', 'prod');
         
-        // Sincroniza com o LocalStorage 'app-supabase-config' para que o AdminSettings 
-        // reconheça que a nuvem está configurada corretamente na interface.
         const currentStored = localStorage.getItem('app-supabase-config');
         const configString = JSON.stringify(configToUse);
         if (currentStored !== configString) {
@@ -97,7 +94,6 @@ const App: React.FC = () => {
 
         isTesting = false;
     } else {
-        // Fallback para lógica antiga se não tiver chaves no código
         const envMode = localStorage.getItem('app-env-mode') || 'prod';
         isTesting = envMode === 'test';
         
@@ -141,6 +137,9 @@ const App: React.FC = () => {
     if (connected) {
       // Subscribe to Orders
       unsubscribe = subscribeToOrders((cloudOrders) => {
+        // Only update if data is different/newer to avoid overwriting optimistic updates unnecessarily
+        // For simplicity in this structure, we just accept the cloud state.
+        // Optimistic updates will temporarily override UI, then this callback confirms it.
         setOrders(cloudOrders);
       });
 
@@ -221,10 +220,13 @@ const App: React.FC = () => {
       };
 
       if (isOnline) {
+        // Optimistic Update for Edit
+        setOrders(prev => prev.map(o => o.id === editingOrder.id ? updatedOrder : o));
         try {
           await updateOrderInSupabase(updatedOrder);
         } catch (e: any) {
           alert(`Erro ao atualizar: ${e.message}`);
+          // Revert or refresh could be added here
           return;
         }
       } else {
@@ -240,10 +242,13 @@ const App: React.FC = () => {
       };
 
       if (isOnline) {
+        // Optimistic Update for Add
+        setOrders(prev => [newOrder, ...prev]);
         try {
           await addOrderToSupabase(newOrder);
         } catch (e: any) {
           alert(`Erro ao salvar no Supabase: ${e.message}`);
+          setOrders(prev => prev.filter(o => o.id !== newOrder.id)); // Revert
           return;
         }
       } else {
@@ -256,34 +261,57 @@ const App: React.FC = () => {
   };
 
   const handleDeleteOrder = async (id: string) => {
+    // Optimistic Delete
+    const previousOrders = [...orders];
+    setOrders(prev => prev.filter(o => o.id !== id));
+
     if (isOnline) {
-       await deleteOrderFromSupabase(id);
-    } else {
-       setOrders(prev => prev.filter(o => o.id !== id));
+       try {
+         await deleteOrderFromSupabase(id);
+       } catch (error) {
+         console.error("Error deleting", error);
+         setOrders(previousOrders); // Revert
+         alert("Erro ao excluir pedido online.");
+       }
     }
   };
 
   const handleUpdateStatus = async (id: string, status: OrderStatus) => {
+    // Optimistic Update
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+
     if (isOnline) {
-      await updateOrderStatusInSupabase(id, status);
-    } else {
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+      try {
+        await updateOrderStatusInSupabase(id, status);
+      } catch(e) {
+        console.error("Error updating status", e);
+      }
     }
   };
 
   const handleUpdatePaid = async (id: string, isPaid: boolean) => {
+    // Optimistic Update
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, isPaid } : o));
+
     if (isOnline) {
-      await updateOrderPaidInSupabase(id, isPaid);
-    } else {
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, isPaid } : o));
+      try {
+        await updateOrderPaidInSupabase(id, isPaid);
+      } catch(e) {
+        console.error("Error updating paid", e);
+      }
     }
   };
 
   const handleUpdateProducts = async (id: string, products: ProductConfig[]) => {
+    // Optimistic Update (CRITICAL for the build parts toggle)
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, products } : o));
+
     if (isOnline) {
-      await updateOrderProducts(id, products);
-    } else {
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, products } : o));
+      try {
+        await updateOrderProducts(id, products);
+      } catch (e) {
+        console.error("Error updating products", e);
+      }
     }
   };
 
