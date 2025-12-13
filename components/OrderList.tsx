@@ -229,56 +229,54 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                     
                     <div className="space-y-3">
                         {order.products.map((product, idx) => {
-                            const isPrinting = order.status === 'Em Impressão';
                             const pStatus = product.printStatus || { part1: false, part2: false, part3: false };
+                            const isAllPrinted = pStatus.part1 && pStatus.part2 && pStatus.part3;
 
                             return (
-                            <div key={idx} className="bg-slate-50 rounded-lg p-3 text-sm border border-slate-100">
+                            <div key={idx} className={`rounded-lg p-3 text-sm border transition-colors ${isAllPrinted ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-100'}`}>
                                 <div className="font-medium text-indigo-900 mb-2 border-b border-slate-200 pb-1 flex justify-between">
                                     <span>Item #{idx + 1}</span>
                                     {product.dogName && <span className="text-indigo-600">{product.dogName}</span>}
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-slate-500 text-xs">{isPrinting ? 'Controle de Impressão:' : 'Cores:'}</span>
+                                        <span className="text-slate-500 text-xs">Produção:</span>
                                         <div className="flex gap-2">
                                             {/* Part 1 */}
                                             <div 
-                                                onClick={() => isPrinting && handleTogglePartStatus(order, idx, 'part1')}
-                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all ${isPrinting ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6' : ''}`} 
+                                                onClick={() => handleTogglePartStatus(order, idx, 'part1')}
+                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
                                                 style={{backgroundColor: product.part1Color}} 
-                                                title="Base"
+                                                title="Base (Clique para confirmar)"
                                             >
-                                                {pStatus.part1 && isPrinting && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
+                                                {pStatus.part1 && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
                                             </div>
 
                                             {/* Part 2 */}
                                             <div 
-                                                onClick={() => isPrinting && handleTogglePartStatus(order, idx, 'part2')}
-                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all ${isPrinting ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6' : ''}`} 
+                                                onClick={() => handleTogglePartStatus(order, idx, 'part2')}
+                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
                                                 style={{backgroundColor: product.part2Color}} 
-                                                title="Bola"
+                                                title="Bola (Clique para confirmar)"
                                             >
-                                                {pStatus.part2 && isPrinting && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
+                                                {pStatus.part2 && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
                                             </div>
 
                                             {/* Part 3 */}
                                             <div 
-                                                onClick={() => isPrinting && handleTogglePartStatus(order, idx, 'part3')}
-                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all ${isPrinting ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6' : ''}`} 
+                                                onClick={() => handleTogglePartStatus(order, idx, 'part3')}
+                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
                                                 style={{backgroundColor: product.part3Color}} 
-                                                title="Topo"
+                                                title="Topo (Clique para confirmar)"
                                             >
-                                                {pStatus.part3 && isPrinting && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
+                                                {pStatus.part3 && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    {isPrinting && (
-                                        <div className="text-[10px] text-slate-400 text-right">
-                                            * Clique na cor para marcar como impresso
-                                        </div>
-                                    )}
+                                    <div className="text-[10px] text-slate-400 text-right">
+                                        * Clique nas cores para marcar as peças prontas
+                                    </div>
 
                                     <div className="flex items-center justify-between">
                                         <span className="text-slate-500 text-xs">Textura:</span>
