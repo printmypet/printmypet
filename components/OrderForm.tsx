@@ -433,7 +433,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           </div>
         )}
         
-        {label && <span className="absolute text-[10px] font-bold text-slate-400/50 uppercase select-none bottom-0 translate-y-full">{label}</span>}
+        {label && <span className="absolute text-[10px] font-bold text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] uppercase select-none top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none tracking-widest">{label}</span>}
       </div>
     );
   };
