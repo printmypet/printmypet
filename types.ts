@@ -42,6 +42,19 @@ export type OrderStatus = 'Pendente' | 'Em Impressão' | 'Acabamento' | 'Conclu�
 
 export type UserRole = 'admin' | 'user';
 
+export type FilamentType = 'PETG' | 'PETGHS' | 'PLA' | 'PLAHS' | 'Outros';
+export type FilamentRating = 'Ótimo' | 'Bom' | 'Médio' | 'Ruim';
+
+export interface Filament {
+  id: string;
+  brand: string;
+  material: string; // Tipo
+  colorName: string;
+  colorHex: string;
+  rating: FilamentRating;
+  quantity: number;
+}
+
 export interface AppUser {
   id: string;
   name: string;

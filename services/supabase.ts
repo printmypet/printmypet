@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture, AppUser } from '../types';
+import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture, AppUser, Filament } from '../types';
 
 let supabase: SupabaseClient | undefined;
 
@@ -254,6 +254,62 @@ export const addTextureToSupabase = async (name: string) => {
 export const deleteTextureFromSupabase = async (id: string) => {
   if (!supabase) return;
   const { error } = await supabase.from('textures').delete().eq('id', id);
+  if (error) throw error;
+};
+
+
+// --- Filament Stock Management ---
+
+export const fetchFilaments = async (): Promise<Filament[]> => {
+  if (!supabase) return [];
+  
+  const { data, error } = await supabase
+    .from('filaments')
+    .select('*')
+    .order('brand', { ascending: true })
+    .order('material', { ascending: true });
+
+  if (error) {
+    console.error("Error fetching filaments", error);
+    return [];
+  }
+
+  return data.map((item: any) => ({
+    id: item.id,
+    brand: item.brand,
+    material: item.material,
+    colorName: item.color_name,
+    colorHex: item.color_hex,
+    rating: item.rating,
+    quantity: item.quantity
+  }));
+};
+
+export const addFilamentToSupabase = async (filament: Omit<Filament, 'id'>) => {
+  if (!supabase) return;
+
+  const payload = {
+    brand: filament.brand,
+    material: filament.material,
+    color_name: filament.colorName,
+    color_hex: filament.colorHex,
+    rating: filament.rating,
+    quantity: filament.quantity
+  };
+
+  const { error } = await supabase.from('filaments').insert([payload]);
+  if (error) throw error;
+};
+
+export const deleteFilamentFromSupabase = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('filaments').delete().eq('id', id);
+  if (error) throw error;
+};
+
+export const updateFilamentQuantity = async (id: string, quantity: number) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('filaments').update({ quantity }).eq('id', id);
   if (error) throw error;
 };
 

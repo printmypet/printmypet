@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User, TrendingUp, DollarSign, Package, Truck, Calendar, Edit2, X, RefreshCw } from 'lucide-react';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User, TrendingUp, DollarSign, Package, Truck, Calendar, Edit2, X, RefreshCw, Spool } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { PartsColors, SupabaseConfig, Texture, ColorOption, AppUser, Order } from '../types';
+import { PartsColors, SupabaseConfig, Texture, ColorOption, AppUser, Order, Filament, FilamentType, FilamentRating } from '../types';
 import { Button } from './ui/Button';
-import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions, registerUser, fetchUsers, updateUser, deleteUser } from '../services/supabase';
+import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions, registerUser, fetchUsers, updateUser, deleteUser, fetchFilaments, addFilamentToSupabase, deleteFilamentFromSupabase, updateFilamentQuantity } from '../services/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AdminSettingsProps {
@@ -29,7 +30,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   currentUser,
   orders = []
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'cloud' | 'testing' | 'users' | 'reports'>(() => {
+  const [activeTab, setActiveTab] = useState<'products' | 'filaments' | 'cloud' | 'testing' | 'users' | 'reports'>(() => {
     return localStorage.getItem('app-supabase-config') ? 'products' : 'cloud';
   });
   
@@ -42,6 +43,27 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   
   // Drag and Drop State
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+
+  // Filament State
+  const [filaments, setFilaments] = useState<Filament[]>([]);
+  const [loadingFilaments, setLoadingFilaments] = useState(false);
+  const [newFilament, setNewFilament] = useState<{
+     brand: string;
+     type: FilamentType;
+     customType: string;
+     colorName: string;
+     colorHex: string;
+     rating: FilamentRating;
+     quantity: number;
+  }>({
+     brand: '',
+     type: 'PLA',
+     customType: '',
+     colorName: '',
+     colorHex: '#000000',
+     rating: 'Bom',
+     quantity: 1
+  });
 
   // Prod Config
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>({
@@ -77,7 +99,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   useEffect(() => {
     // If user is not admin and tries to access restricted tabs, switch to products
-    if (!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports')) {
+    if (!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports' || activeTab === 'filaments')) {
        setActiveTab('products');
     }
   }, [isAdmin, activeTab]);
@@ -108,11 +130,25 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
      }
   }, [activeTab, isOnline]);
 
+  // Fetch Filaments when tab is active
+  useEffect(() => {
+     if (activeTab === 'filaments' && isOnline) {
+         loadFilaments();
+     }
+  }, [activeTab, isOnline]);
+
   const loadUsers = async () => {
      setIsLoadingUsers(true);
      const users = await fetchUsers();
      setUsersList(users);
      setIsLoadingUsers(false);
+  };
+
+  const loadFilaments = async () => {
+     setLoadingFilaments(true);
+     const data = await fetchFilaments();
+     setFilaments(data);
+     setLoadingFilaments(false);
   };
 
   // --- Financial Reports Logic ---
@@ -293,6 +329,44 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     setIsRegistering(false);
   };
 
+  // --- Filament Handlers ---
+
+  const handleAddFilament = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if(!newFilament.brand || !newFilament.colorName) return;
+
+     const material = newFilament.type === 'Outros' ? newFilament.customType : newFilament.type;
+     
+     try {
+       await addFilamentToSupabase({
+         brand: newFilament.brand,
+         material: material,
+         colorName: newFilament.colorName,
+         colorHex: newFilament.colorHex,
+         rating: newFilament.rating,
+         quantity: newFilament.quantity
+       });
+       loadFilaments();
+       setNewFilament({ ...newFilament, brand: '', colorName: '', quantity: 1, customType: '' });
+     } catch (err) {
+       alert("Erro ao salvar filamento.");
+     }
+  };
+
+  const handleDeleteFilament = async (id: string) => {
+      if(confirm("Remover este filamento do estoque?")) {
+          await deleteFilamentFromSupabase(id);
+          loadFilaments();
+      }
+  };
+
+  const handleUpdateFilamentQty = async (id: string, current: number, change: number) => {
+      const newQty = Math.max(0, current + change);
+      await updateFilamentQuantity(id, newQty);
+      // Otimista update visual
+      setFilaments(prev => prev.map(f => f.id === id ? { ...f, quantity: newQty } : f));
+  };
+
   // --- Drag and Drop Handlers ---
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     setDraggedItemIndex(index);
@@ -387,7 +461,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sqlParts = [
-      "-- SCRIPT COMPLETO (v10 - Correção created_at)",
+      "-- SCRIPT COMPLETO (v12 - Com Tabela de Filamentos)",
       "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS type text DEFAULT 'final';",
@@ -417,11 +491,14 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       
       "CREATE TABLE IF NOT EXISTS public.app_users (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, username text NOT NULL UNIQUE, password text NOT NULL, role text DEFAULT 'user');",
       
+      "CREATE TABLE IF NOT EXISTS public.filaments (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), brand text NOT NULL, material text NOT NULL, color_name text NOT NULL, color_hex text DEFAULT '#000000', rating text NOT NULL, quantity numeric DEFAULT 0);",
+
       "ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;",
       "ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;",
       "ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;",
       "ALTER TABLE public.textures DISABLE ROW LEVEL SECURITY;",
-      "ALTER TABLE public.app_users DISABLE ROW LEVEL SECURITY;"
+      "ALTER TABLE public.app_users DISABLE ROW LEVEL SECURITY;",
+      "ALTER TABLE public.filaments DISABLE ROW LEVEL SECURITY;"
     ];
     
     navigator.clipboard.writeText(sqlParts.join('\n'));
@@ -432,6 +509,13 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const partIcons: Record<keyof PartsColors, React.ReactNode> = { base: <Box className="w-4 h-4" />, ball: <Circle className="w-4 h-4" />, top: <Triangle className="w-4 h-4" /> };
 
   const COLORS_PIE = ['#4F46E5', '#3B82F6', '#F59E0B', '#FCD34D'];
+
+  const getRatingColor = (r: string) => {
+     if(r === 'Ótimo') return 'text-green-600 bg-green-50 border-green-200';
+     if(r === 'Bom') return 'text-blue-600 bg-blue-50 border-blue-200';
+     if(r === 'Médio') return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+     return 'text-red-600 bg-red-50 border-red-200';
+  };
 
   return (
     <div className="space-y-8 animate-fade-in-up">
@@ -456,6 +540,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
             </button>
             {isAdmin && (
              <>
+               <button
+                  onClick={() => setActiveTab('filaments')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'filaments' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+               >
+                  Filamentos
+              </button>
                <button
                   onClick={() => setActiveTab('reports')}
                   className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'reports' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
@@ -485,12 +575,171 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         </div>
       </div>
 
-      {!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports') && (
+      {!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports' || activeTab === 'filaments') && (
         <div className="p-8 text-center bg-red-50 border border-red-200 rounded-lg text-red-700">
            <ShieldAlert className="w-12 h-12 mx-auto mb-2 opacity-50" />
            <h3 className="font-bold">Acesso Negado</h3>
            <p>Você não tem permissão para acessar esta área.</p>
         </div>
+      )}
+
+      {/* --- FILAMENTS TAB --- */}
+      {isAdmin && activeTab === 'filaments' && (
+         <div className="space-y-6">
+             <div className="flex items-center gap-3 mb-6">
+                 <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
+                    <Spool className="w-6 h-6" />
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-bold text-slate-900">Estoque de Filamentos</h3>
+                    <p className="text-sm text-slate-500">Gerencie seu inventário de bobinas.</p>
+                 </div>
+            </div>
+
+            {/* Add Filament Form */}
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><Plus className="w-4 h-4" /> Novo Filamento</h4>
+                <form onSubmit={handleAddFilament} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                    <div className="md:col-span-1">
+                        <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Marca</label>
+                        <input 
+                           type="text" 
+                           placeholder="Ex: Voolt3D" 
+                           className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                           value={newFilament.brand}
+                           onChange={e => setNewFilament({...newFilament, brand: e.target.value})}
+                           required 
+                        />
+                    </div>
+                    <div className="md:col-span-1">
+                        <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Tipo</label>
+                        <select 
+                           className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                           value={newFilament.type}
+                           onChange={e => setNewFilament({...newFilament, type: e.target.value as FilamentType})}
+                        >
+                            <option value="PLA">PLA</option>
+                            <option value="PLAHS">PLA High Speed</option>
+                            <option value="PETG">PETG</option>
+                            <option value="PETGHS">PETG High Speed</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    {newFilament.type === 'Outros' && (
+                        <div className="md:col-span-1">
+                            <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Qual Tipo?</label>
+                            <input 
+                               type="text" 
+                               placeholder="Ex: ABS, TPU..." 
+                               className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                               value={newFilament.customType}
+                               onChange={e => setNewFilament({...newFilament, customType: e.target.value})}
+                               required 
+                            />
+                        </div>
+                    )}
+                    <div className="md:col-span-1">
+                        <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Cor</label>
+                        <div className="flex gap-2">
+                             <input 
+                                type="color" 
+                                className="h-9 w-9 p-0.5 rounded border border-slate-300 cursor-pointer"
+                                value={newFilament.colorHex}
+                                onChange={e => setNewFilament({...newFilament, colorHex: e.target.value})}
+                             />
+                             <input 
+                                type="text" 
+                                placeholder="Nome da Cor" 
+                                className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                                value={newFilament.colorName}
+                                onChange={e => setNewFilament({...newFilament, colorName: e.target.value})}
+                                required
+                             />
+                        </div>
+                    </div>
+                    <div className="md:col-span-1">
+                        <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Avaliação</label>
+                        <select 
+                           className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                           value={newFilament.rating}
+                           onChange={e => setNewFilament({...newFilament, rating: e.target.value as FilamentRating})}
+                        >
+                            <option value="Ótimo">Ótimo</option>
+                            <option value="Bom">Bom</option>
+                            <option value="Médio">Médio</option>
+                            <option value="Ruim">Ruim</option>
+                        </select>
+                    </div>
+                    <div className="md:col-span-1">
+                        <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Qtd.</label>
+                        <input 
+                           type="number" 
+                           min="0"
+                           className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                           value={newFilament.quantity}
+                           onChange={e => setNewFilament({...newFilament, quantity: parseInt(e.target.value) || 0})}
+                        />
+                    </div>
+                     <div className="md:col-span-1">
+                         <Button type="submit" className="w-full h-[38px]">
+                             Adicionar
+                         </Button>
+                     </div>
+                </form>
+            </div>
+
+            {/* List */}
+            {loadingFilaments ? (
+                <div className="text-center py-10"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500"/></div>
+            ) : filaments.length === 0 ? (
+                <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                    <p className="text-slate-500">Nenhum filamento cadastrado no estoque.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filaments.map(item => (
+                        <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                             <div className="flex justify-between items-start mb-3">
+                                 <div>
+                                     <h5 className="font-bold text-slate-900">{item.brand}</h5>
+                                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium border border-slate-200">{item.material}</span>
+                                 </div>
+                                 <div className="text-right">
+                                     <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${getRatingColor(item.rating)}`}>{item.rating}</span>
+                                 </div>
+                             </div>
+
+                             <div className="flex items-center gap-3 mb-4">
+                                 <div className="w-8 h-8 rounded-full border border-slate-200 shadow-inner" style={{ backgroundColor: item.colorHex }}></div>
+                                 <span className="text-sm font-medium text-slate-700">{item.colorName}</span>
+                             </div>
+
+                             <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                                 <div className="flex items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 p-1">
+                                     <button 
+                                        onClick={() => handleUpdateFilamentQty(item.id, item.quantity, -1)}
+                                        className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 rounded shadow-sm hover:bg-red-50 hover:text-red-600 transition-colors"
+                                     >-</button>
+                                     <span className="font-bold text-slate-800 w-8 text-center">{item.quantity}</span>
+                                     <button 
+                                        onClick={() => handleUpdateFilamentQty(item.id, item.quantity, 1)}
+                                        className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 rounded shadow-sm hover:bg-green-50 hover:text-green-600 transition-colors"
+                                     >+</button>
+                                 </div>
+                                 
+                                 <button 
+                                    onClick={() => handleDeleteFilament(item.id)}
+                                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                    title="Remover"
+                                 >
+                                     <Trash2 className="w-4 h-4" />
+                                 </button>
+                             </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+         </div>
       )}
 
       {/* --- REPORTS DASHBOARD TAB --- */}
@@ -973,14 +1222,13 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- SCRIPT COMPLETO (v10)
+{`-- SCRIPT COMPLETO (v12)
 -- (Clique no botão copiar para ver tudo)
 CREATE TABLE IF NOT EXISTS public.customers (...);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric;
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean;
-ALTER TABLE public.colors ADD COLUMN IF NOT EXISTS position integer;
--- (+ Migrações automáticas de colunas)`}
+-- Tabela de Filamentos adicionada
+CREATE TABLE IF NOT EXISTS public.filaments (id uuid DEFAULT gen_random_uuid() PRIMARY KEY...);
+`}
                     </pre>
                     <button 
                         onClick={copySql}
