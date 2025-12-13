@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2, Users, Truck, Loader2, Search } from 'lucide-react';
+import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2, Users, Truck, Loader2, Search, ImageOff } from 'lucide-react';
 import { 
   ColorOption,
   Order, 
@@ -365,57 +365,71 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     className?: string, 
     texturePattern?: string | null,
     label?: string
-  }) => (
-    <div className={`relative flex justify-center items-center ${className}`} style={{ zIndex }}>
-      {/* 1. Base Color Layer (Masked to shape) */}
-      <div 
-        className="absolute inset-0 w-full h-full bg-current transition-colors duration-300"
-        style={{ 
-          backgroundColor: color,
-          maskImage: `url(${imageSrc})`,
-          WebkitMaskImage: `url(${imageSrc})`,
-          maskSize: 'contain',
-          WebkitMaskSize: 'contain',
-          maskRepeat: 'no-repeat',
-          WebkitMaskRepeat: 'no-repeat',
-          maskPosition: 'center',
-          WebkitMaskPosition: 'center'
-        }}
-      />
+  }) => {
+    const [hasError, setHasError] = useState(false);
 
-      {/* 2. Texture Overlay (If applicable) */}
-      {texturePattern && texturePattern !== 'Liso' && (
-         <div 
-         className="absolute inset-0 w-full h-full opacity-30 pointer-events-none"
-         style={{ 
-           maskImage: `url(${imageSrc})`,
-           WebkitMaskImage: `url(${imageSrc})`,
-           maskSize: 'contain',
-           WebkitMaskSize: 'contain',
-           maskRepeat: 'no-repeat',
-           WebkitMaskRepeat: 'no-repeat',
-           maskPosition: 'center',
-           WebkitMaskPosition: 'center'
-         }}
-       >
-           <svg width="100%" height="100%">
-             {getTexturePattern(texturePattern)}
-             <rect width="100%" height="100%" fill={getPatternId(texturePattern)} />
-           </svg>
-       </div>
-      )}
+    return (
+      <div className={`relative flex justify-center items-center ${className}`} style={{ zIndex }}>
+        {!hasError ? (
+          <>
+            {/* 1. Base Color Layer (Masked to shape) */}
+            <div 
+              className="absolute inset-0 w-full h-full bg-current transition-colors duration-300"
+              style={{ 
+                backgroundColor: color,
+                maskImage: `url(${imageSrc})`,
+                WebkitMaskImage: `url(${imageSrc})`,
+                maskSize: 'contain',
+                WebkitMaskSize: 'contain',
+                maskRepeat: 'no-repeat',
+                WebkitMaskRepeat: 'no-repeat',
+                maskPosition: 'center',
+                WebkitMaskPosition: 'center'
+              }}
+            />
 
-      {/* 3. Shadow/Depth Overlay (The original image blended) */}
-      <img 
-        src={imageSrc} 
-        alt="Part" 
-        className="relative w-full h-full object-contain mix-blend-multiply opacity-80 pointer-events-none" 
-      />
-      
-      {/* Label */}
-      {label && <span className="absolute text-[10px] font-bold text-slate-400/50 uppercase select-none bottom-0 translate-y-full">{label}</span>}
-    </div>
-  );
+            {/* 2. Texture Overlay (If applicable) */}
+            {texturePattern && texturePattern !== 'Liso' && (
+              <div 
+              className="absolute inset-0 w-full h-full opacity-30 pointer-events-none"
+              style={{ 
+                maskImage: `url(${imageSrc})`,
+                WebkitMaskImage: `url(${imageSrc})`,
+                maskSize: 'contain',
+                WebkitMaskSize: 'contain',
+                maskRepeat: 'no-repeat',
+                WebkitMaskRepeat: 'no-repeat',
+                maskPosition: 'center',
+                WebkitMaskPosition: 'center'
+              }}
+            >
+                <svg width="100%" height="100%">
+                  {getTexturePattern(texturePattern)}
+                  <rect width="100%" height="100%" fill={getPatternId(texturePattern)} />
+                </svg>
+            </div>
+            )}
+
+            {/* 3. Shadow/Depth Overlay (The original image blended) */}
+            <img 
+              src={imageSrc} 
+              alt="Part" 
+              className="relative w-full h-full object-contain mix-blend-multiply opacity-80 pointer-events-none" 
+              onError={() => setHasError(true)}
+            />
+          </>
+        ) : (
+          <div className="w-full h-full border-2 border-dashed border-red-300 rounded flex flex-col items-center justify-center bg-red-50 p-2 text-center">
+             <ImageOff className="w-4 h-4 text-red-400 mb-1" />
+             <span className="text-[8px] text-red-400 font-mono leading-tight">Faltando:<br/>{imageSrc}</span>
+          </div>
+        )}
+        
+        {/* Label */}
+        {label && <span className="absolute text-[10px] font-bold text-slate-400/50 uppercase select-none bottom-0 translate-y-full">{label}</span>}
+      </div>
+    );
+  };
 
   return (
     <form onSubmit={handleSubmit} className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
