@@ -605,7 +605,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                         <input 
                            type="text" 
                            placeholder="Ex: Voolt3D" 
-                           className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                           className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
                            value={newFilament.brand}
                            onChange={e => setNewFilament({...newFilament, brand: e.target.value})}
                            required 
@@ -614,7 +614,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     <div className="md:col-span-1">
                         <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Tipo</label>
                         <select 
-                           className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                           className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
                            value={newFilament.type}
                            onChange={e => setNewFilament({...newFilament, type: e.target.value as FilamentType})}
                         >
@@ -631,7 +631,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                             <input 
                                type="text" 
                                placeholder="Ex: ABS, TPU..." 
-                               className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                               className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
                                value={newFilament.customType}
                                onChange={e => setNewFilament({...newFilament, customType: e.target.value})}
                                required 
@@ -643,14 +643,14 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                         <div className="flex gap-2">
                              <input 
                                 type="color" 
-                                className="h-9 w-9 p-0.5 rounded border border-slate-300 cursor-pointer"
+                                className="h-9 w-9 p-0.5 rounded border border-slate-300 cursor-pointer bg-white"
                                 value={newFilament.colorHex}
                                 onChange={e => setNewFilament({...newFilament, colorHex: e.target.value})}
                              />
                              <input 
                                 type="text" 
                                 placeholder="Nome da Cor" 
-                                className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                                className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
                                 value={newFilament.colorName}
                                 onChange={e => setNewFilament({...newFilament, colorName: e.target.value})}
                                 required
@@ -660,7 +660,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     <div className="md:col-span-1">
                         <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Avaliação</label>
                         <select 
-                           className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                           className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
                            value={newFilament.rating}
                            onChange={e => setNewFilament({...newFilament, rating: e.target.value as FilamentRating})}
                         >
@@ -675,7 +675,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                         <input 
                            type="number" 
                            min="0"
-                           className="w-full rounded-lg border-slate-300 border p-2 text-sm"
+                           className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
                            value={newFilament.quantity}
                            onChange={e => setNewFilament({...newFilament, quantity: parseInt(e.target.value) || 0})}
                         />
@@ -1057,7 +1057,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                             type="text" 
                             value={testConfig.supabaseUrl}
                             onChange={(e) => setTestConfig({...testConfig, supabaseUrl: e.target.value})}
-                            className="w-full rounded-md border-orange-200 shadow-sm p-2 border focus:ring-orange-500 focus:border-orange-500"
+                            className="w-full rounded-md border-orange-200 shadow-sm p-2 border focus:ring-orange-500 focus:border-orange-500 bg-white"
                             placeholder="https://test-project.supabase.co"
                         />
                     </div>
@@ -1067,7 +1067,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                             type="password" 
                             value={testConfig.supabaseKey}
                             onChange={(e) => setTestConfig({...testConfig, supabaseKey: e.target.value})}
-                            className="w-full rounded-md border-orange-200 shadow-sm p-2 border focus:ring-orange-500 focus:border-orange-500"
+                            className="w-full rounded-md border-orange-200 shadow-sm p-2 border focus:ring-orange-500 focus:border-orange-500 bg-white"
                             placeholder="Key do projeto de testes..."
                         />
                     </div>
@@ -1160,7 +1160,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                             type="text" 
                             value={supabaseConfig.supabaseUrl}
                             onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseUrl: e.target.value})}
-                            className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
+                            className="w-full rounded-md border-slate-300 shadow-sm p-2 border bg-white"
                             placeholder="https://xyz.supabase.co"
                             required
                         />
@@ -1171,7 +1171,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                             type="password" 
                             value={supabaseConfig.supabaseKey}
                             onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseKey: e.target.value})}
-                            className="w-full rounded-md border-slate-300 shadow-sm p-2 border"
+                            className="w-full rounded-md border-slate-300 shadow-sm p-2 border bg-white"
                             placeholder="eyJxh..."
                             required
                         />
