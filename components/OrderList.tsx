@@ -1,13 +1,14 @@
 
 import React, { useState } from 'react';
-import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck, AlertCircle } from 'lucide-react';
-import { Order, OrderStatus } from '../types';
+import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck, AlertCircle, Check } from 'lucide-react';
+import { Order, OrderStatus, ProductConfig } from '../types';
 import { Button } from './ui/Button';
 
 interface OrderListProps {
   orders: Order[];
   onUpdateStatus: (id: string, status: OrderStatus) => void;
   onUpdatePaid: (id: string, isPaid: boolean) => void;
+  onUpdateProducts?: (id: string, products: ProductConfig[]) => void;
   onDelete: (id: string) => void;
   onEdit: (order: Order) => void;
 }
@@ -22,7 +23,7 @@ const statusColors: Record<OrderStatus, string> = {
 
 type FilterType = 'open' | 'completed' | 'all';
 
-export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, onUpdatePaid, onDelete, onEdit }) => {
+export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, onUpdatePaid, onUpdateProducts, onDelete, onEdit }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('open');
   const [showOnlyPaid, setShowOnlyPaid] = useState(false);
@@ -52,6 +53,23 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
+  const handleTogglePartStatus = (order: Order, productIndex: number, part: 'part1' | 'part2' | 'part3') => {
+     if (!onUpdateProducts) return;
+
+     const newProducts = [...order.products];
+     const currentStatus = newProducts[productIndex].printStatus || { part1: false, part2: false, part3: false };
+     
+     newProducts[productIndex] = {
+        ...newProducts[productIndex],
+        printStatus: {
+           ...currentStatus,
+           [part]: !currentStatus[part]
+        }
+     };
+
+     onUpdateProducts(order.id, newProducts);
   };
 
   return (
@@ -210,21 +228,58 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                     </h4>
                     
                     <div className="space-y-3">
-                        {order.products.map((product, idx) => (
+                        {order.products.map((product, idx) => {
+                            const isPrinting = order.status === 'Em Impressão';
+                            const pStatus = product.printStatus || { part1: false, part2: false, part3: false };
+
+                            return (
                             <div key={idx} className="bg-slate-50 rounded-lg p-3 text-sm border border-slate-100">
                                 <div className="font-medium text-indigo-900 mb-2 border-b border-slate-200 pb-1 flex justify-between">
                                     <span>Item #{idx + 1}</span>
                                     {product.dogName && <span className="text-indigo-600">{product.dogName}</span>}
                                 </div>
-                                <div className="space-y-1">
+                                <div className="space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-slate-500 text-xs">Cores:</span>
-                                        <div className="flex gap-1">
-                                            <div className="w-3 h-3 rounded-full border border-slate-300" style={{backgroundColor: product.part1Color}} title="Base"></div>
-                                            <div className="w-3 h-3 rounded-full border border-slate-300" style={{backgroundColor: product.part2Color}} title="Bola"></div>
-                                            <div className="w-3 h-3 rounded-full border border-slate-300" style={{backgroundColor: product.part3Color}} title="Topo"></div>
+                                        <span className="text-slate-500 text-xs">{isPrinting ? 'Controle de Impressão:' : 'Cores:'}</span>
+                                        <div className="flex gap-2">
+                                            {/* Part 1 */}
+                                            <div 
+                                                onClick={() => isPrinting && handleTogglePartStatus(order, idx, 'part1')}
+                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all ${isPrinting ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6' : ''}`} 
+                                                style={{backgroundColor: product.part1Color}} 
+                                                title="Base"
+                                            >
+                                                {pStatus.part1 && isPrinting && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
+                                            </div>
+
+                                            {/* Part 2 */}
+                                            <div 
+                                                onClick={() => isPrinting && handleTogglePartStatus(order, idx, 'part2')}
+                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all ${isPrinting ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6' : ''}`} 
+                                                style={{backgroundColor: product.part2Color}} 
+                                                title="Bola"
+                                            >
+                                                {pStatus.part2 && isPrinting && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
+                                            </div>
+
+                                            {/* Part 3 */}
+                                            <div 
+                                                onClick={() => isPrinting && handleTogglePartStatus(order, idx, 'part3')}
+                                                className={`relative w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center transition-all ${isPrinting ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6' : ''}`} 
+                                                style={{backgroundColor: product.part3Color}} 
+                                                title="Topo"
+                                            >
+                                                {pStatus.part3 && isPrinting && <Check className="w-4 h-4 text-white drop-shadow-md stroke-[3]" />}
+                                            </div>
                                         </div>
                                     </div>
+                                    
+                                    {isPrinting && (
+                                        <div className="text-[10px] text-slate-400 text-right">
+                                            * Clique na cor para marcar como impresso
+                                        </div>
+                                    )}
+
                                     <div className="flex items-center justify-between">
                                         <span className="text-slate-500 text-xs">Textura:</span>
                                         <span className="text-slate-800 text-xs">{product.textureValue}</span>
@@ -240,7 +295,7 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                                     )}
                                 </div>
                             </div>
-                        ))}
+                        )})}
                     </div>
                   </div>
 

@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture, AppUser, Filament } from '../types';
+import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture, AppUser, Filament, ProductConfig } from '../types';
 
 let supabase: SupabaseClient | undefined;
 
@@ -552,6 +552,20 @@ export const updateOrderInSupabase = async (order: Order) => {
 
   if (error) {
     console.error("Error updating order in Supabase: ", error);
+    throw error;
+  }
+};
+
+export const updateOrderProducts = async (orderId: string, products: ProductConfig[]) => {
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('orders')
+    .update({ products })
+    .eq('id', orderId);
+
+  if (error) {
+    console.error("Error updating order products in Supabase: ", error);
     throw error;
   }
 };

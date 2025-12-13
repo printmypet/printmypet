@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Database, Beaker, LogOut, User } from 'lucide-react';
-import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig, Texture, AppUser } from './types';
+import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig, Texture, AppUser, ProductConfig } from './types';
 import { OrderForm } from './components/OrderForm';
 import { OrderList } from './components/OrderList';
 import { StatsDashboard } from './components/StatsDashboard';
@@ -18,7 +18,8 @@ import {
   updateOrderPaidInSupabase, 
   deleteOrderFromSupabase,
   fetchColorsFromSupabase,
-  fetchTexturesFromSupabase
+  fetchTexturesFromSupabase,
+  updateOrderProducts
 } from './services/supabase';
 
 // --- CONFIGURAÇÃO FIXA (HARDCODED) ---
@@ -268,6 +269,14 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateProducts = async (id: string, products: ProductConfig[]) => {
+    if (isOnline) {
+      await updateOrderProducts(id, products);
+    } else {
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, products } : o));
+    }
+  };
+
   const handleEditClick = (order: Order) => {
     setEditingOrder(order);
     setView('edit');
@@ -389,6 +398,7 @@ const App: React.FC = () => {
                 orders={orders} 
                 onUpdateStatus={handleUpdateStatus} 
                 onUpdatePaid={handleUpdatePaid}
+                onUpdateProducts={handleUpdateProducts}
                 onDelete={handleDeleteOrder}
                 onEdit={handleEditClick}
              />

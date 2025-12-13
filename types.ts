@@ -84,6 +84,12 @@ export interface Customer {
   state?: string;
 }
 
+export interface ProductPrintStatus {
+  part1: boolean; // Base
+  part2: boolean; // Bola
+  part3: boolean; // Topo
+}
+
 export interface ProductConfig {
   id: string; // Temporary ID for list management in form
   part1Color: string; // Base
@@ -93,6 +99,7 @@ export interface ProductConfig {
   textureValue: string;
   dogName: string;
   observations: string;
+  printStatus?: ProductPrintStatus;
 }
 
 export interface Order {
