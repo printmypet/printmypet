@@ -461,7 +461,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     const sqlParts = [
-      "-- SCRIPT COMPLETO (v12 - Com Tabela de Filamentos)",
+      "-- SCRIPT COMPLETO (v13 - Produção e Testes)",
+      "-- Tabelas de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS type text DEFAULT 'final';",
@@ -479,20 +480,26 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS state text;",
       "CREATE UNIQUE INDEX IF NOT EXISTS customers_cpf_unique_idx ON public.customers (cpf) WHERE cpf IS NOT NULL AND cpf != '';",
       
+      "-- Tabela de Cores",
       "CREATE TABLE IF NOT EXISTS public.colors (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, name text NOT NULL, hex text NOT NULL, part_type text NOT NULL, position integer DEFAULT 999);",
       "ALTER TABLE public.colors ADD COLUMN IF NOT EXISTS position integer DEFAULT 999;",
 
+      "-- Tabela de Texturas",
       "CREATE TABLE IF NOT EXISTS public.textures (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, name text NOT NULL UNIQUE);",
       
+      "-- Tabela de Pedidos",
       "CREATE TABLE IF NOT EXISTS public.orders (id uuid PRIMARY KEY, status text, price numeric, shipping_cost numeric, is_paid boolean, products jsonb, customer jsonb, customer_id uuid REFERENCES public.customers(id));",
       "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();",
       "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_cost numeric DEFAULT 0;",
       "ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS is_paid boolean DEFAULT false;",
       
+      "-- Tabela de Usuários do App (Admin/User)",
       "CREATE TABLE IF NOT EXISTS public.app_users (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, username text NOT NULL UNIQUE, password text NOT NULL, role text DEFAULT 'user');",
       
+      "-- Tabela de Estoque de Filamentos",
       "CREATE TABLE IF NOT EXISTS public.filaments (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), brand text NOT NULL, material text NOT NULL, color_name text NOT NULL, color_hex text DEFAULT '#000000', rating text NOT NULL, quantity numeric DEFAULT 0);",
 
+      "-- Segurança RLS (Desativada para facilitar uso com Chave Anônima)",
       "ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;",
       "ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;",
       "ALTER TABLE public.colors DISABLE ROW LEVEL SECURITY;",
@@ -1072,7 +1079,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                         />
                     </div>
                     <Button type="submit" disabled={isTesting} className="bg-orange-600 hover:bg-orange-700 text-white w-full">
-                         {isTesting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                         {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                          Salvar Configuração de Testes
                     </Button>
                  </form>
@@ -1222,7 +1229,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
                 <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
                     <pre className="text-emerald-300">
-{`-- SCRIPT COMPLETO (v12)
+{`-- SCRIPT COMPLETO (v13)
 -- (Clique no botão copiar para ver tudo)
 CREATE TABLE IF NOT EXISTS public.customers (...);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();

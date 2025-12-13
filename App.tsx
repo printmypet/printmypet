@@ -23,7 +23,7 @@ import {
 } from './services/supabase';
 
 // --- CONFIGURAÇÃO FIXA (HARDCODED) ---
-// SE ESTAS CHAVES ESTIVEREM AQUI, ELAS SERÃO USADAS.
+// SE ESTAS CHAVES ESTIVEREM AQUI, ELAS SERÃO USADAS AUTOMATICAMENTE PARA PRODUÇÃO.
 const FIXED_CONFIG = {
   url: "https://ptymvjqnsxdllljqaeqz.supabase.co",
   key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0eW12anFuc3hkbGxsanFhZXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzOTk5NjgsImV4cCI6MjA4MDk3NTk2OH0.N6To6n4hKRBFAtQKq1XUahR-LEDyfenekBiI_GoLkDk"
@@ -83,8 +83,18 @@ const App: React.FC = () => {
             supabaseUrl: FIXED_CONFIG.url,
             supabaseKey: FIXED_CONFIG.key
         };
-        // Força modo produção se estiver usando chaves fixas para evitar conflito
+        
+        // Força modo produção
         localStorage.setItem('app-env-mode', 'prod');
+        
+        // Sincroniza com o LocalStorage 'app-supabase-config' para que o AdminSettings 
+        // reconheça que a nuvem está configurada corretamente na interface.
+        const currentStored = localStorage.getItem('app-supabase-config');
+        const configString = JSON.stringify(configToUse);
+        if (currentStored !== configString) {
+           localStorage.setItem('app-supabase-config', configString);
+        }
+
         isTesting = false;
     } else {
         // Fallback para lógica antiga se não tiver chaves no código
