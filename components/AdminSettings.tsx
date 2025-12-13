@@ -1,7 +1,7 @@
 
 // @ts-nocheck
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User, TrendingUp, DollarSign, Package, Truck, Calendar, Edit2, X, RefreshCw, Spool } from 'lucide-react';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User, TrendingUp, DollarSign, Package, Truck, Calendar, Edit2, X, RefreshCw, Disc } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { PartsColors, SupabaseConfig, Texture, ColorOption, AppUser, Order, Filament, FilamentType, FilamentRating } from '../types';
 import { Button } from './ui/Button';
@@ -623,7 +623,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
          <div className="space-y-6">
              <div className="flex items-center gap-3 mb-6">
                  <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
-                    <Spool className="w-6 h-6" />
+                    <Disc className="w-6 h-6" />
                  </div>
                  <div>
                     <h3 className="text-lg font-bold text-slate-900">Estoque de Filamentos</h3>
