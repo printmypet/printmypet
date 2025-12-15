@@ -334,8 +334,14 @@ export const fetchCategories = async (): Promise<Category[]> => {
   // 2. Fetch Subcategories
   const { data: subcategories, error: subError } = await supabase.from('subcategories').select('*').order('name', { ascending: true });
   
-  if (subError && subError.code !== '42P01') {
-      console.error("Error fetching subcategories:", subError.message);
+  if (subError) {
+      // 42P01 = table missing. Also check for text message.
+      const isMissingTable = subError.code === '42P01' || subError.message.includes('Could not find the table');
+      
+      if (!isMissingTable) {
+          console.error("Error fetching subcategories:", subError.message);
+      }
+      // If table missing, we just don't have subcategories yet.
   }
 
   // 3. Map together
@@ -356,6 +362,12 @@ export const addCategory = async (name: string) => {
   if (error) throw error;
 };
 
+export const updateCategory = async (id: string, name: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('categories').update({ name }).eq('id', id);
+  if (error) throw error;
+};
+
 export const deleteCategory = async (id: string) => {
   if (!supabase) return;
   const { error } = await supabase.from('categories').delete().eq('id', id);
@@ -367,6 +379,12 @@ export const deleteCategory = async (id: string) => {
 export const addSubcategory = async (name: string, categoryId: string) => {
   if (!supabase) return;
   const { error } = await supabase.from('subcategories').insert([{ name, category_id: categoryId }]);
+  if (error) throw error;
+};
+
+export const updateSubcategory = async (id: string, name: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('subcategories').update({ name }).eq('id', id);
   if (error) throw error;
 };
 
@@ -450,6 +468,26 @@ export const addCatalogProduct = async (product: Omit<CatalogProduct, 'id'>) => 
   const { error } = await supabase.from('catalog_products').insert([payload]);
   if (error) {
     console.error("Error adding catalog product:", error.message);
+    throw error;
+  }
+};
+
+export const updateCatalogProduct = async (product: CatalogProduct) => {
+  if (!supabase) return;
+
+  const payload = {
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    image_url: product.imageUrl,
+    category: product.category,
+    subcategory: product.subcategory,
+    highlight: product.highlight
+  };
+
+  const { error } = await supabase.from('catalog_products').update(payload).eq('id', product.id);
+  if (error) {
+    console.error("Error updating catalog product:", error.message);
     throw error;
   }
 };

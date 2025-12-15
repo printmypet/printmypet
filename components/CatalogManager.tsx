@@ -1,19 +1,22 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Tag, DollarSign, Image as ImageIcon, Loader2, ShoppingBag, LayoutTemplate, Layers, FolderOpen, ArrowRight, X } from 'lucide-react';
+import { Plus, Trash2, Tag, DollarSign, Image as ImageIcon, Loader2, ShoppingBag, LayoutTemplate, Layers, FolderOpen, ArrowRight, X, Edit2, Check } from 'lucide-react';
 import { Button } from './ui/Button';
 import { CatalogProduct, Category, Banner } from '../types';
 import { 
   addCatalogProduct, 
+  updateCatalogProduct,
   deleteCatalogProduct, 
   fetchCatalogProducts,
   fetchCategories,
   addCategory,
+  updateCategory,
   deleteCategory,
   fetchBanners,
   addBanner,
   deleteBanner,
   addSubcategory,
+  updateSubcategory,
   deleteSubcategory
 } from '../services/supabase';
 
@@ -24,6 +27,7 @@ export const CatalogManager: React.FC = () => {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<CatalogProduct | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Categories State
@@ -31,6 +35,11 @@ export const CatalogManager: React.FC = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSubcategoryName, setNewSubcategoryName] = useState('');
   const [addingSubToCategory, setAddingSubToCategory] = useState<string | null>(null);
+  
+  // Inline Editing State for Categories/Subcategories
+  const [editingCategory, setEditingCategory] = useState<{id: string, name: string} | null>(null);
+  const [editingSubcategory, setEditingSubcategory] = useState<{id: string, name: string} | null>(null);
+
 
   // Banners State
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -77,7 +86,7 @@ export const CatalogManager: React.FC = () => {
     const data = await fetchCategories();
     setCategories(data);
     // Set default category if available and not set
-    if (data.length > 0 && !newItem.category) {
+    if (data.length > 0 && !newItem.category && !editingProduct) {
        setNewItem(prev => ({ ...prev, category: data[0].name }));
     }
   };
@@ -122,25 +131,22 @@ export const CatalogManager: React.FC = () => {
   };
 
   // --- Product Handlers ---
-  const handleSubmitProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newItem.name || !newItem.price) return;
-
-    setSubmitting(true);
-    try {
-      // Limpa a formatação: remove pontos de milhar e troca vírgula por ponto
-      const cleanPrice = parseFloat(newItem.price.replace(/\./g, '').replace(',', '.'));
-
-      await addCatalogProduct({
-        name: newItem.name,
-        description: newItem.description,
-        price: cleanPrice,
-        imageUrl: newItem.imageUrl,
-        category: newItem.category || (categories[0]?.name || 'Geral'),
-        subcategory: newItem.subcategory,
-        highlight: newItem.highlight
+  const startEditProduct = (product: CatalogProduct) => {
+      setEditingProduct(product);
+      setNewItem({
+          name: product.name,
+          description: product.description || '',
+          price: product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          imageUrl: product.imageUrl || '',
+          category: product.category,
+          subcategory: product.subcategory || '',
+          highlight: product.highlight
       });
-      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEditProduct = () => {
+      setEditingProduct(null);
       setNewItem({
         name: '',
         description: '',
@@ -150,7 +156,37 @@ export const CatalogManager: React.FC = () => {
         subcategory: '',
         highlight: false
       });
+  };
+
+  const handleSubmitProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItem.name || !newItem.price) return;
+
+    setSubmitting(true);
+    try {
+      // Limpa a formatação: remove pontos de milhar e troca vírgula por ponto
+      const cleanPrice = parseFloat(newItem.price.replace(/\./g, '').replace(',', '.'));
+
+      const payload = {
+        name: newItem.name,
+        description: newItem.description,
+        price: cleanPrice,
+        imageUrl: newItem.imageUrl,
+        category: newItem.category || (categories[0]?.name || 'Geral'),
+        subcategory: newItem.subcategory,
+        highlight: newItem.highlight
+      };
+
+      if (editingProduct) {
+          await updateCatalogProduct({
+              ...payload,
+              id: editingProduct.id
+          });
+      } else {
+          await addCatalogProduct(payload);
+      }
       
+      cancelEditProduct();
       await loadProducts();
     } catch (error) {
       alert("Erro ao salvar produto.");
@@ -177,6 +213,16 @@ export const CatalogManager: React.FC = () => {
     } catch(e) { alert("Erro ao criar categoria"); }
   };
 
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if(!editingCategory || !editingCategory.name) return;
+      try {
+          await updateCategory(editingCategory.id, editingCategory.name);
+          setEditingCategory(null);
+          loadCategories();
+      } catch(e) { alert("Erro ao atualizar categoria"); }
+  };
+
   const handleDeleteCategory = async (id: string) => {
     if(confirm("Excluir categoria e todas as suas subcategorias?")) {
       await deleteCategory(id);
@@ -194,6 +240,16 @@ export const CatalogManager: React.FC = () => {
         setAddingSubToCategory(null);
         loadCategories();
     } catch(e) { alert("Erro ao criar subcategoria"); }
+  };
+
+  const handleUpdateSubcategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!editingSubcategory || !editingSubcategory.name) return;
+    try {
+        await updateSubcategory(editingSubcategory.id, editingSubcategory.name);
+        setEditingSubcategory(null);
+        loadCategories();
+    } catch(e) { alert("Erro ao atualizar subcategoria"); }
   };
 
   const handleDeleteSubcategory = async (id: string) => {
@@ -264,8 +320,14 @@ export const CatalogManager: React.FC = () => {
       {activeTab === 'products' && (
       <>
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Novo Produto
+          <h4 className="font-semibold text-slate-800 mb-4 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                 {editingProduct ? <Edit2 className="w-4 h-4"/> : <Plus className="w-4 h-4" />}
+                 {editingProduct ? 'Editar Produto' : 'Novo Produto'}
+              </span>
+              {editingProduct && (
+                  <button onClick={cancelEditProduct} className="text-xs text-red-500 hover:underline">Cancelar Edição</button>
+              )}
           </h4>
           <form onSubmit={handleSubmitProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-1">
@@ -378,8 +440,8 @@ export const CatalogManager: React.FC = () => {
               </div>
               <div className="md:col-span-2">
                   <Button type="submit" disabled={submitting} className="w-full">
-                      {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                      Cadastrar Produto
+                      {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : editingProduct ? <Edit2 className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                      {editingProduct ? 'Atualizar Produto' : 'Cadastrar Produto'}
                   </Button>
               </div>
           </form>
@@ -394,7 +456,7 @@ export const CatalogManager: React.FC = () => {
               </div>
           ) : (
               products.map(product => (
-                  <div key={product.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                  <div key={product.id} className={`bg-white rounded-xl border overflow-hidden shadow-sm flex flex-col ${editingProduct?.id === product.id ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-200'}`}>
                       <div className="h-40 bg-slate-100 relative">
                           {product.imageUrl ? (
                               <img src={resolveImagePath(product.imageUrl)} alt={product.name} className="w-full h-full object-cover" />
@@ -427,12 +489,22 @@ export const CatalogManager: React.FC = () => {
                           <p className="text-xs text-slate-500 mb-3 line-clamp-2">{product.description}</p>
                           <div className="mt-auto flex items-center justify-between pt-3 border-t border-slate-100">
                               <span className="font-bold text-slate-800 text-lg">R$ {product.price.toFixed(2)}</span>
-                              <button 
-                                  onClick={() => handleDeleteProduct(product.id)}
-                                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                              >
-                                  <Trash2 className="w-4 h-4" />
-                              </button>
+                              <div className="flex gap-1">
+                                  <button 
+                                      onClick={() => startEditProduct(product)}
+                                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                      title="Editar"
+                                  >
+                                      <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                      onClick={() => handleDeleteProduct(product.id)}
+                                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Excluir"
+                                  >
+                                      <Trash2 className="w-4 h-4" />
+                                  </button>
+                              </div>
                           </div>
                       </div>
                   </div>
@@ -470,17 +542,42 @@ export const CatalogManager: React.FC = () => {
                     {categories.map(cat => (
                         <div key={cat.id} className="bg-slate-50 rounded-lg border border-slate-100 p-3">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="font-bold text-slate-800">{cat.name}</span>
+                                {editingCategory?.id === cat.id ? (
+                                    <form onSubmit={handleUpdateCategory} className="flex items-center gap-2 flex-1 mr-2">
+                                        <input 
+                                            type="text" 
+                                            value={editingCategory.name}
+                                            onChange={e => setEditingCategory({...editingCategory, name: e.target.value})}
+                                            className="flex-1 text-sm p-1 rounded border border-indigo-300 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                            autoFocus
+                                        />
+                                        <button type="submit" className="text-green-600 hover:bg-green-50 p-1 rounded"><Check className="w-4 h-4"/></button>
+                                        <button type="button" onClick={() => setEditingCategory(null)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X className="w-4 h-4"/></button>
+                                    </form>
+                                ) : (
+                                    <span className="font-bold text-slate-800">{cat.name}</span>
+                                )}
+                                
                                 <div className="flex items-center gap-2">
-                                    <button 
-                                        onClick={() => setAddingSubToCategory(cat.id)}
-                                        className="text-indigo-500 hover:text-indigo-700 text-xs font-medium bg-white px-2 py-1 rounded border border-slate-200"
-                                    >
-                                        + Sub
-                                    </button>
-                                    <button onClick={() => handleDeleteCategory(cat.id)} className="text-slate-400 hover:text-red-500">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    {!editingCategory && (
+                                        <>
+                                            <button 
+                                                onClick={() => setAddingSubToCategory(cat.id)}
+                                                className="text-indigo-500 hover:text-indigo-700 text-xs font-medium bg-white px-2 py-1 rounded border border-slate-200"
+                                            >
+                                                + Sub
+                                            </button>
+                                            <button 
+                                                onClick={() => setEditingCategory({id: cat.id, name: cat.name})}
+                                                className="text-slate-400 hover:text-indigo-500"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => handleDeleteCategory(cat.id)} className="text-slate-400 hover:text-red-500">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                             
@@ -488,14 +585,38 @@ export const CatalogManager: React.FC = () => {
                             <div className="pl-4 space-y-1 border-l-2 border-slate-200 ml-1">
                                 {cat.subcategories && cat.subcategories.length > 0 ? (
                                     cat.subcategories.map(sub => (
-                                        <div key={sub.id} className="flex items-center justify-between text-sm group">
-                                            <span className="text-slate-600">{sub.name}</span>
-                                            <button 
-                                                onClick={() => handleDeleteSubcategory(sub.id)}
-                                                className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <X className="w-3 h-3" />
-                                            </button>
+                                        <div key={sub.id} className="flex items-center justify-between text-sm group h-8">
+                                            {editingSubcategory?.id === sub.id ? (
+                                                <form onSubmit={handleUpdateSubcategory} className="flex items-center gap-2 flex-1">
+                                                     <input 
+                                                        type="text" 
+                                                        value={editingSubcategory.name}
+                                                        onChange={e => setEditingSubcategory({...editingSubcategory, name: e.target.value})}
+                                                        className="flex-1 text-xs p-1 rounded border border-indigo-300 bg-white"
+                                                        autoFocus
+                                                    />
+                                                    <button type="submit" className="text-green-600"><Check className="w-3 h-3"/></button>
+                                                    <button type="button" onClick={() => setEditingSubcategory(null)} className="text-red-500"><X className="w-3 h-3"/></button>
+                                                </form>
+                                            ) : (
+                                                <>
+                                                    <span className="text-slate-600">{sub.name}</span>
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => setEditingSubcategory({id: sub.id, name: sub.name})}
+                                                            className="text-slate-300 hover:text-indigo-500"
+                                                        >
+                                                            <Edit2 className="w-3 h-3" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteSubcategory(sub.id)}
+                                                            className="text-slate-300 hover:text-red-400"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     ))
                                 ) : (
