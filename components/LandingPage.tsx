@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Settings, ShoppingBag, Search, Menu, X, ArrowRight } from 'lucide-react';
+import { Settings, ShoppingBag, Search, Menu, X, ArrowRight, Filter } from 'lucide-react';
 import { CatalogProduct, Category, Banner } from '../types';
 import { fetchCatalogProducts, fetchCategories, fetchBanners } from '../services/supabase';
 
@@ -16,6 +16,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction }) =
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentBanner, setCurrentBanner] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
 
   useEffect(() => {
     loadData();
@@ -56,6 +57,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction }) =
        theme: 'purple'
     }
   ] as Banner[];
+
+  const filteredProducts = selectedCategory === 'Todos' 
+    ? products 
+    : products.filter(p => p.category === selectedCategory);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -156,16 +161,50 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction }) =
          </div>
       </section>
 
+      {/* --- CATEGORY NAV --- */}
+      <section className="sticky top-16 z-40 bg-slate-50/90 backdrop-blur-sm border-b border-slate-200 py-4">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide no-scrollbar">
+                <button
+                    onClick={() => setSelectedCategory('Todos')}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
+                        selectedCategory === 'Todos' 
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                >
+                   {selectedCategory === 'Todos' && <Filter className="w-3 h-3" />}
+                   Todos
+                </button>
+                {categories.map(cat => (
+                    <button
+                        key={cat.id}
+                        onClick={() => setSelectedCategory(cat.name)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                            selectedCategory === cat.name
+                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                    >
+                        {cat.name}
+                    </button>
+                ))}
+            </div>
+         </div>
+      </section>
+
       {/* --- PRODUCT SHOWCASE --- */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Section Title */}
         <div className="flex items-center justify-between mb-8">
              <h2 className="text-2xl font-bold text-slate-900 relative pl-4">
                  <span className="absolute left-0 top-1 bottom-1 w-1 bg-indigo-600 rounded-full"></span>
-                 Destaques e Novidades
+                 {selectedCategory === 'Todos' ? 'Destaques e Novidades' : `Categoria: ${selectedCategory}`}
              </h2>
-             <span className="text-sm text-slate-500 hidden sm:block">Mostrando {products.length} produtos</span>
+             <span className="text-sm text-slate-500 hidden sm:block">
+                 Mostrando {filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''}
+             </span>
         </div>
 
         {/* Grid */}
@@ -175,15 +214,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction }) =
                      <div key={i} className="bg-white rounded-xl h-64 animate-pulse border border-slate-200"></div>
                  ))}
              </div>
-        ) : products.length === 0 ? (
+        ) : filteredProducts.length === 0 ? (
              <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-200">
                  <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                 <h3 className="text-lg font-medium text-slate-600">Nenhum produto no catálogo</h3>
-                 <p className="text-slate-400 text-sm">Volte em breve para conferir as novidades!</p>
+                 <h3 className="text-lg font-medium text-slate-600">Nenhum produto encontrado</h3>
+                 <p className="text-slate-400 text-sm">
+                     Não há produtos nesta categoria no momento.
+                 </p>
+                 <button 
+                    onClick={() => setSelectedCategory('Todos')}
+                    className="mt-4 text-indigo-600 text-sm font-medium hover:underline"
+                 >
+                     Ver todos os produtos
+                 </button>
              </div>
         ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {products.map(product => (
+                {filteredProducts.map(product => (
                     <div key={product.id} className="group bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col">
                         <div className="relative h-48 bg-slate-100 overflow-hidden">
                             {product.imageUrl ? (
