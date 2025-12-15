@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User, Lock, Key, ArrowRight, LogIn, WifiOff } from 'lucide-react';
+import { User, Lock, Key, ArrowRight, LogIn, WifiOff, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/Button';
 import { loginUser } from '../services/supabase';
 import { AppUser } from '../types';
@@ -8,9 +8,10 @@ import { AppUser } from '../types';
 interface LoginPageProps {
   onLogin: (user: AppUser) => void;
   isOnline: boolean;
+  onBack: () => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isOnline }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isOnline, onBack }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   
@@ -49,7 +50,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isOnline }) => {
                <LogIn className="w-8 h-8 text-indigo-400" />
              </div>
              <h1 className="text-2xl font-bold text-white mb-1 tracking-tight font-logo">
-               PrintMy<span className="text-sky-400">[PET]</span>3D
+               PrintMy<span className="text-sky-400">[]</span>3D
              </h1>
              <p className="text-slate-400 text-sm">Controle de Produção</p>
            </div>
@@ -120,10 +121,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isOnline }) => {
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full mt-4" disabled={loading}>
-              {loading ? 'Entrando...' : 'Acessar Sistema'}
-              {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
-            </Button>
+            
+            <div className="space-y-3 mt-6">
+                <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Entrando...' : 'Acessar Sistema'}
+                {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
+                </Button>
+                
+                <Button 
+                    type="button" 
+                    variant="secondary" 
+                    className="w-full"
+                    onClick={onBack}
+                >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Voltar
+                </Button>
+            </div>
           </form>
         </div>
       </div>

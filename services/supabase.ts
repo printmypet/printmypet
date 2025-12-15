@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture, AppUser, Filament, ProductConfig } from '../types';
+import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture, AppUser, Filament, ProductConfig, CatalogProduct, Category, Banner } from '../types';
 
 let supabase: SupabaseClient | undefined;
 
@@ -116,7 +116,7 @@ export const fetchUsers = async (): Promise<AppUser[]> => {
     .order('name', { ascending: true });
   
   if (error) {
-    console.error("Error fetching users", error);
+    console.error("Error fetching users", error.message);
     return [];
   }
   return data as AppUser[];
@@ -176,7 +176,10 @@ export const fetchColorsFromSupabase = async (): Promise<PartsColors | null> => 
     .order('created_at', { ascending: true });
   
   if (error || !data) {
-    console.error('Error fetching colors:', error);
+    // Only log distinct error if it's not the common "table missing" on first run
+    if (error?.code !== '42P01') {
+       console.error('Error fetching colors:', error?.message);
+    }
     return null;
   }
 
@@ -235,7 +238,9 @@ export const fetchTexturesFromSupabase = async (): Promise<Texture[] | null> => 
   const { data, error } = await supabase.from('textures').select('*').order('created_at', { ascending: true });
   
   if (error || !data) {
-    console.error('Error fetching textures:', error);
+    if (error?.code !== '42P01') {
+       console.error('Error fetching textures:', error?.message);
+    }
     return null;
   }
 
@@ -270,7 +275,7 @@ export const fetchFilaments = async (): Promise<Filament[]> => {
     .order('material', { ascending: true });
 
   if (error) {
-    console.error("Error fetching filaments", error);
+    console.error("Error fetching filaments", error.message);
     return [];
   }
 
@@ -310,6 +315,113 @@ export const deleteFilamentFromSupabase = async (id: string) => {
 export const updateFilamentQuantity = async (id: string, quantity: number) => {
   if (!supabase) return;
   const { error } = await supabase.from('filaments').update({ quantity }).eq('id', id);
+  if (error) throw error;
+};
+
+
+// --- Catalog Categories Management ---
+
+export const fetchCategories = async (): Promise<Category[]> => {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
+  if (error) {
+     if (error.code !== '42P01') console.error("Error fetching categories:", error.message);
+     return [];
+  }
+  return data;
+};
+
+export const addCategory = async (name: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('categories').insert([{ name }]);
+  if (error) throw error;
+};
+
+export const deleteCategory = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw error;
+};
+
+
+// --- Catalog Banners Management ---
+
+export const fetchBanners = async (): Promise<Banner[]> => {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('banners').select('*').order('created_at', { ascending: false });
+  if (error) {
+     if (error.code !== '42P01') console.error("Error fetching banners:", error.message);
+     return [];
+  }
+  return data;
+};
+
+export const addBanner = async (banner: Omit<Banner, 'id'>) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('banners').insert([banner]);
+  if (error) throw error;
+};
+
+export const deleteBanner = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('banners').delete().eq('id', id);
+  if (error) throw error;
+};
+
+
+// --- Catalog Products Management ---
+
+export const fetchCatalogProducts = async (): Promise<CatalogProduct[]> => {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from('catalog_products')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    // 42P01: undefined_table. Means the user hasn't run the migration SQL yet.
+    if (error.code === '42P01') {
+       console.warn("Tabela 'catalog_products' não encontrada. Execute o script SQL no painel Admin.");
+    } else {
+       console.error("Error fetching catalog:", error.message);
+    }
+    return [];
+  }
+
+  return data.map((item: any) => ({
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    price: item.price,
+    imageUrl: item.image_url,
+    category: item.category,
+    highlight: item.highlight
+  }));
+};
+
+export const addCatalogProduct = async (product: Omit<CatalogProduct, 'id'>) => {
+  if (!supabase) return;
+
+  const payload = {
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    image_url: product.imageUrl,
+    category: product.category,
+    highlight: product.highlight
+  };
+
+  const { error } = await supabase.from('catalog_products').insert([payload]);
+  if (error) {
+    console.error("Error adding catalog product:", error.message);
+    throw error;
+  }
+};
+
+export const deleteCatalogProduct = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('catalog_products').delete().eq('id', id);
   if (error) throw error;
 };
 
@@ -437,7 +549,7 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching orders:', error);
+      console.error('Error fetching orders:', error.message);
       return;
     }
     
@@ -524,7 +636,7 @@ export const addOrderToSupabase = async (order: Order) => {
     .insert([cleanPayload]);
 
   if (error) {
-    console.error("Error adding order to Supabase: ", error);
+    console.error("Error adding order to Supabase: ", error.message);
     throw error;
   }
 };
@@ -551,7 +663,7 @@ export const updateOrderInSupabase = async (order: Order) => {
     .eq('id', order.id);
 
   if (error) {
-    console.error("Error updating order in Supabase: ", error);
+    console.error("Error updating order in Supabase: ", error.message);
     throw error;
   }
 };
@@ -565,7 +677,7 @@ export const updateOrderProducts = async (orderId: string, products: ProductConf
     .eq('id', orderId);
 
   if (error) {
-    console.error("Error updating order products in Supabase: ", error);
+    console.error("Error updating order products in Supabase: ", error.message);
     throw error;
   }
 };

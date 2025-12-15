@@ -55,6 +55,28 @@ export interface Filament {
   quantity: number;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+}
+
+export interface Banner {
+  id: string;
+  title: string;
+  subtitle: string;
+  theme: 'blue' | 'purple' | 'dark'; // Simplified theme selection
+}
+
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  imageUrl: string;
+  category: string;
+  highlight: boolean;
+}
+
 export interface AppUser {
   id: string;
   name: string;

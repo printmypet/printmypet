@@ -671,12 +671,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                     label="BOLA"
                   />
 
-                  {/* Part 1 (Base) - Image Based - Increased Size (w-64) */}
+                  {/* Part 1 (Base) - Image Based - Updated Size */}
                   <PartRenderer 
                     imageSrc="base.png"
                     color={currentProduct.part1Color}
                     zIndex={10}
-                    className="w-[19rem] h-24"
+                    className="w-[19rem] h-24" 
                     label="BASE"
                   />
                 </div>

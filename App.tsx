@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Database, Beaker, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Database, Beaker, LogOut, User, Store } from 'lucide-react';
 import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig, Texture, AppUser, ProductConfig } from './types';
 import { OrderForm } from './components/OrderForm';
 import { OrderList } from './components/OrderList';
 import { StatsDashboard } from './components/StatsDashboard';
 import { AdminSettings } from './components/AdminSettings';
 import { LoginPage } from './components/LoginPage';
+import { LandingPage } from './components/LandingPage';
 import { Button } from './components/ui/Button';
 import { 
   initSupabase, 
@@ -31,6 +32,9 @@ const FIXED_CONFIG = {
 };
 
 const App: React.FC = () => {
+  // State to control Landing Page vs App
+  const [showLanding, setShowLanding] = useState(true);
+
   // Auth State
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
 
@@ -305,10 +309,15 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     setView('list');
+    setShowLanding(true); 
   };
 
+  if (showLanding) {
+    return <LandingPage onEnterProduction={() => setShowLanding(false)} />;
+  }
+
   if (!currentUser) {
-    return <LoginPage onLogin={setCurrentUser} isOnline={isOnline} />;
+    return <LoginPage onLogin={setCurrentUser} isOnline={isOnline} onBack={() => setShowLanding(true)} />;
   }
 
   return (
@@ -336,6 +345,13 @@ const App: React.FC = () => {
               <span className="flex items-center gap-1 text-slate-300">
                 <User className="w-3 h-3" /> {currentUser.name} ({currentUser.role})
               </span>
+              <button
+                onClick={() => setShowLanding(true)}
+                className="flex items-center gap-1 hover:text-sky-400 transition-colors mr-2 text-slate-300"
+                title="Voltar para o site"
+              >
+                <Store className="w-3 h-3" /> Ir para Loja
+              </button>
               <button 
                 onClick={handleLogout}
                 className="flex items-center gap-1 hover:text-red-400 transition-colors"
@@ -352,7 +368,7 @@ const App: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center cursor-pointer select-none font-logo" onClick={() => { setView('list'); setEditingOrder(null); }}>
               <span className="text-2xl font-bold tracking-tight text-slate-900">PrintMy</span>
-              <span className="text-2xl font-bold tracking-tight text-sky-400">[PET]</span>
+              <span className="text-2xl font-bold tracking-tight text-sky-400">[]</span>
               <span className="text-2xl font-bold tracking-tight text-slate-900">3D</span>
             </div>
             
@@ -443,7 +459,7 @@ const App: React.FC = () => {
       <footer className="bg-white border-t border-slate-200 mt-auto">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-slate-500">
-            &copy; {new Date().getFullYear()} PrintMy[PET]3D. Controle de Produção.
+            &copy; {new Date().getFullYear()} PrintMy[]3D. Controle de Produção.
           </p>
         </div>
       </footer>

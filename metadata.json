@@ -1,5 +1,6 @@
+
 {
-  "name": "PrintMy[PET]3D",
+  "name": "PrintMy[]3D",
   "description": "Sistema de gerenciamento de pedidos de impressão 3D com personalização detalhada de produtos e controle de clientes.",
   "requestFramePermissions": []
 }

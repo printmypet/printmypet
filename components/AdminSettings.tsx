@@ -1,12 +1,13 @@
 
 // @ts-nocheck
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User, TrendingUp, DollarSign, Package, Truck, Calendar, Edit2, X, RefreshCw, Disc } from 'lucide-react';
+import { Trash2, Plus, Settings, Palette, Layers, Box, Circle, Triangle, Cloud, CloudOff, Save, Database, Copy, CheckCircle, AlertTriangle, Loader2, GripVertical, Beaker, ShieldAlert, UserPlus, Users, Lock, ShieldCheck, User, TrendingUp, DollarSign, Package, Truck, Calendar, Edit2, X, RefreshCw, Disc, ShoppingBag, Eye, EyeOff } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { PartsColors, SupabaseConfig, Texture, ColorOption, AppUser, Order, Filament, FilamentType, FilamentRating } from '../types';
 import { Button } from './ui/Button';
 import { testConnection, addColorToSupabase, deleteColorFromSupabase, addTextureToSupabase, deleteTextureFromSupabase, updateColorPositions, registerUser, fetchUsers, updateUser, deleteUser, fetchFilaments, addFilamentToSupabase, deleteFilamentFromSupabase, updateFilamentQuantity } from '../services/supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { CatalogManager } from './CatalogManager';
 
 interface AdminSettingsProps {
   partsColors: PartsColors;
@@ -17,7 +18,7 @@ interface AdminSettingsProps {
   onRefreshColors?: () => void;
   isOnline: boolean;
   currentUser: AppUser | null;
-  orders?: Order[]; // Adicionado para relatórios
+  orders?: Order[];
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ 
@@ -31,7 +32,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   currentUser,
   orders = []
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'filaments' | 'cloud' | 'testing' | 'users' | 'reports'>(() => {
+  const [activeTab, setActiveTab] = useState<'products' | 'catalog' | 'filaments' | 'cloud' | 'testing' | 'users' | 'reports'>(() => {
     return localStorage.getItem('app-supabase-config') ? 'products' : 'cloud';
   });
   
@@ -41,6 +42,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [newTextureName, setNewTextureName] = useState('');
   const [isProcessingColor, setIsProcessingColor] = useState(false);
   const [isProcessingTexture, setIsProcessingTexture] = useState(false);
+  const [showSqlPreview, setShowSqlPreview] = useState(false);
   
   // Drag and Drop State
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
@@ -100,7 +102,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   useEffect(() => {
     // If user is not admin and tries to access restricted tabs, switch to products
-    if (!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports' || activeTab === 'filaments')) {
+    if (!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports' || activeTab === 'filaments' || activeTab === 'catalog')) {
        setActiveTab('products');
     }
   }, [isAdmin, activeTab]);
@@ -460,9 +462,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
     }
   };
 
-  const copySql = () => {
-    const sqlParts = [
-      "-- SCRIPT COMPLETO (v16 - CORREÇÃO DE ERRO 42710 + Tabela Filaments)",
+  const getSqlScript = () => {
+    return [
+      "-- SCRIPT COMPLETO (v18 - ADIÇÃO TABELAS CATEGORIAS E BANNERS)",
+      
       "-- 1. Tabelas de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
       "ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cpf text;",
@@ -500,44 +503,59 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "-- 6. Tabela de Estoque de Filamentos",
       "CREATE TABLE IF NOT EXISTS public.filaments (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), brand text NOT NULL, material text NOT NULL, color_name text NOT NULL, color_hex text DEFAULT '#000000', rating text NOT NULL, quantity numeric DEFAULT 0);",
 
-      "-- 7. Segurança RLS (Limpeza e Recriação)",
+      "-- 7. Tabela de Catálogo de Produtos (Vitrine)",
+      "CREATE TABLE IF NOT EXISTS public.catalog_products (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, description text, price numeric NOT NULL, image_url text, category text DEFAULT 'Geral', highlight boolean DEFAULT false);",
+
+      "-- 8. Tabelas de Categorias e Banners",
+      "CREATE TABLE IF NOT EXISTS public.categories (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL UNIQUE);",
+      "CREATE TABLE IF NOT EXISTS public.banners (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), title text NOT NULL, subtitle text, theme text DEFAULT 'blue');",
+
+      "-- 9. Segurança RLS (Limpeza e Recriação)",
       
-      "-- Orders",
       "ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;",
       "DROP POLICY IF EXISTS \"Public Access Orders\" ON public.orders;",
       "CREATE POLICY \"Public Access Orders\" ON public.orders FOR ALL USING (true) WITH CHECK (true);",
 
-      "-- Customers",
       "ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;",
       "DROP POLICY IF EXISTS \"Public Access Customers\" ON public.customers;",
       "CREATE POLICY \"Public Access Customers\" ON public.customers FOR ALL USING (true) WITH CHECK (true);",
 
-      "-- Colors",
       "ALTER TABLE public.colors ENABLE ROW LEVEL SECURITY;",
       "DROP POLICY IF EXISTS \"Public Access Colors\" ON public.colors;",
       "CREATE POLICY \"Public Access Colors\" ON public.colors FOR ALL USING (true) WITH CHECK (true);",
 
-      "-- Textures",
       "ALTER TABLE public.textures ENABLE ROW LEVEL SECURITY;",
       "DROP POLICY IF EXISTS \"Public Access Textures\" ON public.textures;",
       "CREATE POLICY \"Public Access Textures\" ON public.textures FOR ALL USING (true) WITH CHECK (true);",
 
-      "-- Users",
       "ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;",
       "DROP POLICY IF EXISTS \"Public Access Users\" ON public.app_users;",
       "CREATE POLICY \"Public Access Users\" ON public.app_users FOR ALL USING (true) WITH CHECK (true);",
 
-      "-- Filaments",
       "ALTER TABLE public.filaments ENABLE ROW LEVEL SECURITY;",
       "DROP POLICY IF EXISTS \"Public Access Filaments\" ON public.filaments;",
       "CREATE POLICY \"Public Access Filaments\" ON public.filaments FOR ALL USING (true) WITH CHECK (true);",
+
+      "ALTER TABLE public.catalog_products ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Catalog\" ON public.catalog_products;",
+      "CREATE POLICY \"Public Access Catalog\" ON public.catalog_products FOR ALL USING (true) WITH CHECK (true);",
+
+      "ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Categories\" ON public.categories;",
+      "CREATE POLICY \"Public Access Categories\" ON public.categories FOR ALL USING (true) WITH CHECK (true);",
+
+      "ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Banners\" ON public.banners;",
+      "CREATE POLICY \"Public Access Banners\" ON public.banners FOR ALL USING (true) WITH CHECK (true);",
       
-      "-- 8. INSERIR ADMIN PADRÃO (Se não existir)",
+      "-- 10. INSERIR ADMIN PADRÃO (Se não existir)",
       "INSERT INTO public.app_users (name, username, password, role) SELECT 'Administrador', 'admin', 'passroot', 'admin' WHERE NOT EXISTS (SELECT 1 FROM public.app_users WHERE username = 'admin');"
-    ];
-    
-    navigator.clipboard.writeText(sqlParts.join('\n'));
-    alert("SQL Completo (v16) copiado! Cole no SQL Editor do Supabase.");
+    ].join('\n');
+  };
+
+  const copySql = () => {
+    navigator.clipboard.writeText(getSqlScript());
+    alert("SQL Completo (v18) copiado! Cole no SQL Editor do Supabase.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = { base: 'Base', ball: 'Bola', top: 'Tampa/Topo' };
@@ -571,10 +589,16 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                 onClick={() => setActiveTab('products')}
                 className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'products' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
             >
-                Produtos
+                Partes & Cores
             </button>
             {isAdmin && (
              <>
+               <button
+                  onClick={() => setActiveTab('catalog')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'catalog' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+               >
+                  Catálogo (Vitrine)
+              </button>
                <button
                   onClick={() => setActiveTab('filaments')}
                   className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'filaments' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
@@ -597,25 +621,30 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                   onClick={() => setActiveTab('cloud')}
                   className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'cloud' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
                >
-                  Nuvem (Prod)
+                  Nuvem
               </button>
               <button
                   onClick={() => setActiveTab('testing')}
                   className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'testing' ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500'}`}
               >
-                  Área de Testes
+                  Testes
               </button>
              </>
             )}
         </div>
       </div>
 
-      {!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports' || activeTab === 'filaments') && (
+      {!isAdmin && (activeTab === 'cloud' || activeTab === 'testing' || activeTab === 'users' || activeTab === 'reports' || activeTab === 'filaments' || activeTab === 'catalog') && (
         <div className="p-8 text-center bg-red-50 border border-red-200 rounded-lg text-red-700">
            <ShieldAlert className="w-12 h-12 mx-auto mb-2 opacity-50" />
            <h3 className="font-bold">Acesso Negado</h3>
            <p>Você não tem permissão para acessar esta área.</p>
         </div>
+      )}
+
+      {/* --- CATALOG TAB --- */}
+      {isAdmin && activeTab === 'catalog' && (
+         <CatalogManager />
       )}
 
       {/* --- FILAMENTS TAB --- */}
@@ -777,512 +806,419 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
          </div>
       )}
 
-      {/* --- REPORTS DASHBOARD TAB --- */}
+      {/* --- REPORTS TAB --- */}
       {isAdmin && activeTab === 'reports' && (
         <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-6">
+             <div className="flex items-center gap-3 mb-6">
                  <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
                     <TrendingUp className="w-6 h-6" />
                  </div>
                  <div>
-                    <h3 className="text-lg font-bold text-slate-900">Dashboard Financeiro</h3>
-                    <p className="text-sm text-slate-500">Visão geral de faturamento, pendências e custos.</p>
+                    <h3 className="text-lg font-bold text-slate-900">Relatórios Financeiros</h3>
+                    <p className="text-sm text-slate-500">Acompanhe o desempenho das suas vendas.</p>
                  </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
-                    <div className="relative z-10">
-                        <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
-                           <CheckCircle className="w-4 h-4 text-green-500" /> Total Pago
-                        </p>
-                        <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatCurrency(financialData.totalPaid)}</h3>
-                        <p className="text-xs text-green-600 mt-1 font-medium">{financialData.paidOrdersCount} pedidos pagos</p>
-                    </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
-                    <div className="relative z-10">
-                        <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
-                           <AlertTriangle className="w-4 h-4 text-yellow-500" /> A Receber
-                        </p>
-                        <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatCurrency(financialData.totalPending)}</h3>
-                        <p className="text-xs text-yellow-600 mt-1 font-medium">Pendente de pagamento</p>
-                    </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
-                    <div className="relative z-10">
-                        <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
-                           <Package className="w-4 h-4 text-indigo-500" /> Prod. Vendidos (Pago)
-                        </p>
-                        <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatCurrency(financialData.paidProducts)}</h3>
-                        <p className="text-xs text-slate-400 mt-1">Líquido de frete</p>
-                    </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-                     <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
-                     <div className="relative z-10">
-                        <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
-                           <Truck className="w-4 h-4 text-blue-500" /> Frete Repassado (Pago)
-                        </p>
-                        <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatCurrency(financialData.paidShipping)}</h3>
-                        <p className="text-xs text-slate-400 mt-1">Valor destinado a envio</p>
-                     </div>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2 text-slate-500 text-xs uppercase font-bold">
+                     <Package className="w-4 h-4" /> Total Pedidos
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900">{financialData.totalOrders}</div>
+               </div>
+               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2 text-green-600 text-xs uppercase font-bold">
+                     <DollarSign className="w-4 h-4" /> Receita Confirmada
+                  </div>
+                  <div className="text-2xl font-bold text-green-600">{formatCurrency(financialData.totalPaid)}</div>
+                  <div className="text-xs text-slate-400 mt-1">{financialData.paidOrdersCount} pedidos pagos</div>
+               </div>
+               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2 text-amber-600 text-xs uppercase font-bold">
+                     <Clock className="w-4 h-4" /> Pendente Recebimento
+                  </div>
+                  <div className="text-2xl font-bold text-amber-600">{formatCurrency(financialData.totalPending)}</div>
+               </div>
+               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2 text-blue-600 text-xs uppercase font-bold">
+                     <Truck className="w-4 h-4" /> Gasto com Fretes
+                  </div>
+                  <div className="text-2xl font-bold text-blue-600">{formatCurrency(financialData.paidShipping + financialData.pendingShipping)}</div>
+               </div>
             </div>
 
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                {/* Status Chart */}
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-6">Status Financeiro Geral</h4>
-                    <div className="h-72 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartDataStatus} margin={{top: 20, right: 30, left: 20, bottom: 5}}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                <YAxis 
-                                    axisLine={false} 
-                                    tickLine={false} 
-                                    tickFormatter={(val) => `R$ ${val}`} 
-                                    width={80}
-                                />
-                                <Tooltip 
-                                    cursor={{fill: '#f8fafc'}}
-                                    formatter={(value: number) => formatCurrency(value)}
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                />
-                                <Bar dataKey="valor" radius={[4, 4, 0, 0]}>
-                                    {chartDataStatus.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={index === 0 ? '#22c55e' : '#eab308'} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-80">
+                   <h4 className="font-semibold text-slate-800 mb-4 text-sm uppercase">Comparativo: Pago vs Pendente</h4>
+                   <ResponsiveContainer width="100%" height="100%">
+                     <BarChart data={chartDataStatus} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
+                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                       <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                       <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `R$${val}`} />
+                       <Tooltip cursor={{fill: 'transparent'}} formatter={(value: number) => formatCurrency(value)} />
+                       <Bar dataKey="valor" radius={[4, 4, 0, 0]}>
+                         {chartDataStatus.map((entry, index) => (
+                           <Cell key={`cell-${index}`} fill={index === 0 ? '#10B981' : '#F59E0B'} />
+                         ))}
+                       </Bar>
+                     </BarChart>
+                   </ResponsiveContainer>
                 </div>
 
-                {/* Composition Chart */}
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-6">Composição dos Valores</h4>
-                    <div className="h-72 w-full flex flex-col md:flex-row items-center justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={chartDataComposition}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    paddingAngle={2}
-                                    dataKey="value"
-                                >
-                                    {chartDataComposition.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS_PIE[index % COLORS_PIE.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip 
-                                    formatter={(value: number) => formatCurrency(value)}
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div className="flex flex-col gap-2 text-xs text-slate-600 min-w-[150px]">
-                            {chartDataComposition.map((entry, index) => (
-                                <div key={entry.name} className="flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS_PIE[index % COLORS_PIE.length] }}></span>
-                                    <span>{entry.name}: <strong>{formatCurrency(entry.value)}</strong></span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-80">
+                   <h4 className="font-semibold text-slate-800 mb-4 text-sm uppercase">Composição da Receita</h4>
+                   <ResponsiveContainer width="100%" height="100%">
+                     <PieChart>
+                        <Pie
+                          data={chartDataComposition}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {chartDataComposition.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS_PIE[index % COLORS_PIE.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        <Legend />
+                     </PieChart>
+                   </ResponsiveContainer>
                 </div>
             </div>
         </div>
       )}
 
-      {/* --- USER MANAGEMENT TAB --- */}
+      {/* --- USERS TAB --- */}
       {isAdmin && activeTab === 'users' && (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-                   <div className="flex items-center gap-3">
-                      <div className="p-2 bg-indigo-100 rounded-full text-indigo-600">
-                          <Users className="w-6 h-6" />
+         <div className="space-y-6">
+             <div className="flex items-center gap-3 mb-6">
+                 <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
+                    <Users className="w-6 h-6" />
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-bold text-slate-900">Gerenciamento de Usuários</h3>
+                    <p className="text-sm text-slate-500">Adicione ou remova acesso ao sistema administrativo.</p>
+                 </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               <div className="lg:col-span-1 bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-fit">
+                   <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                       {editingUserId ? <Edit2 className="w-4 h-4"/> : <UserPlus className="w-4 h-4" />} 
+                       {editingUserId ? 'Editar Usuário' : 'Novo Usuário'}
+                   </h4>
+                   
+                   {userMsg && (
+                       <div className={`mb-4 p-3 rounded-lg text-sm flex items-start gap-2 ${userMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                           {userMsg.type === 'success' ? <CheckCircle className="w-4 h-4 mt-0.5" /> : <AlertTriangle className="w-4 h-4 mt-0.5" />}
+                           {userMsg.text}
+                       </div>
+                   )}
+
+                   <form onSubmit={handleRegisterOrUpdateUser} className="space-y-4">
+                       <div>
+                           <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Nome Completo</label>
+                           <input 
+                             type="text" 
+                             className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
+                             value={newUserName}
+                             onChange={e => setNewUserName(e.target.value)}
+                             required
+                           />
+                       </div>
+                       <div>
+                           <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Login (Username)</label>
+                           <input 
+                             type="text" 
+                             className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
+                             value={newUserLogin}
+                             onChange={e => setNewUserLogin(e.target.value)}
+                             required
+                           />
+                       </div>
+                       <div>
+                           <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Senha</label>
+                           <input 
+                             type="text" // Visible for admin ease
+                             className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
+                             value={newUserPass}
+                             onChange={e => setNewUserPass(e.target.value)}
+                             placeholder={editingUserId ? "Deixe em branco para manter" : ""}
+                             required={!editingUserId}
+                           />
+                       </div>
+                       <div className="flex items-center gap-2 pt-2">
+                           <input 
+                             type="checkbox" 
+                             id="isAdmin"
+                             checked={newUserIsAdmin}
+                             onChange={e => setNewUserIsAdmin(e.target.checked)}
+                             className="w-4 h-4 text-indigo-600 rounded"
+                           />
+                           <label htmlFor="isAdmin" className="text-sm text-slate-700 select-none">Acesso Admin Total</label>
+                       </div>
+                       
+                       <div className="pt-2 flex gap-2">
+                           {editingUserId && (
+                               <Button type="button" variant="secondary" onClick={resetUserForm} className="flex-1">
+                                   Cancelar
+                               </Button>
+                           )}
+                           <Button type="submit" disabled={isRegistering} className="flex-1">
+                               {isRegistering ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                               Salvar
+                           </Button>
+                       </div>
+                   </form>
+               </div>
+
+               <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                   <h4 className="font-semibold text-slate-800 mb-4">Usuários Cadastrados ({usersList.length})</h4>
+                   {isLoadingUsers ? (
+                       <div className="text-center py-8 text-slate-400">Carregando...</div>
+                   ) : (
+                       <div className="space-y-3">
+                           {usersList.map(user => (
+                               <div key={user.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors bg-slate-50">
+                                   <div className="flex items-center gap-3">
+                                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}>
+                                           {user.role === 'admin' ? <ShieldCheck className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                                       </div>
+                                       <div>
+                                           <p className="font-medium text-slate-900 text-sm">{user.name}</p>
+                                           <p className="text-xs text-slate-500 flex items-center gap-1">
+                                               <span className="font-mono bg-white px-1 rounded border border-slate-200">@{user.username}</span>
+                                               {user.role === 'admin' && <span className="text-indigo-600 font-bold ml-1">ADMIN</span>}
+                                           </p>
+                                       </div>
+                                   </div>
+                                   <div className="flex items-center gap-2">
+                                       <button onClick={() => handleEditUser(user)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors">
+                                           <Edit2 className="w-4 h-4" />
+                                       </button>
+                                       {user.username !== 'admin' && (
+                                           <button onClick={() => handleDeleteUser(user.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                                               <Trash2 className="w-4 h-4" />
+                                           </button>
+                                       )}
+                                   </div>
+                               </div>
+                           ))}
+                       </div>
+                   )}
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* --- CLOUD TAB --- */}
+      {isAdmin && activeTab === 'cloud' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className={`p-3 rounded-full ${isCloudConfigured ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-600'}`}>
+                  {isCloudConfigured ? <CheckCircle className="w-8 h-8" /> : <Cloud className="w-8 h-8" />}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    {isCloudConfigured ? 'Conectado à Nuvem (Produção)' : 'Configuração de Nuvem (Supabase)'}
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    {isCloudConfigured 
+                      ? 'Seus dados estão sendo sincronizados em tempo real.' 
+                      : 'Conecte-se para sincronizar pedidos entre dispositivos.'}
+                  </p>
+                </div>
+              </div>
+
+              {!isCloudConfigured ? (
+                <form onSubmit={(e) => handleSaveCloudConfig(e, 'prod')} className="space-y-4 max-w-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Project URL</label>
+                    <input 
+                      type="text" 
+                      value={supabaseConfig.supabaseUrl}
+                      onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseUrl: e.target.value})}
+                      placeholder="https://xyz.supabase.co"
+                      className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Anon Public Key</label>
+                    <input 
+                      type="password" 
+                      value={supabaseConfig.supabaseKey}
+                      onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseKey: e.target.value})}
+                      placeholder="eyJh..."
+                      className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
+                      required
+                    />
+                  </div>
+
+                  {testResult && !testResult.success && (
+                    <div className="p-3 bg-red-50 text-red-700 text-sm rounded border border-red-200 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      {testResult.message}
+                    </div>
+                  )}
+
+                  <Button type="submit" disabled={isTesting}>
+                    {isTesting ? 'Testando Conexão...' : 'Salvar e Conectar'}
+                  </Button>
+                  
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                     <p className="text-xs text-slate-500 mb-2">Ainda não tem o banco configurado?</p>
+                     <div className="flex gap-2">
+                       <Button type="button" variant="outline" size="sm" onClick={() => setShowSqlPreview(!showSqlPreview)}>
+                          {showSqlPreview ? <EyeOff className="w-3 h-3 mr-2" /> : <Eye className="w-3 h-3 mr-2" />} 
+                          {showSqlPreview ? 'Ocultar Script SQL' : 'Ver Script SQL'}
+                       </Button>
+                       <Button type="button" variant="outline" size="sm" onClick={copySql}>
+                          <Copy className="w-3 h-3 mr-2" /> Copiar
+                       </Button>
+                     </div>
+                     
+                     {showSqlPreview && (
+                        <div className="mt-3 bg-slate-800 rounded-lg p-3 overflow-hidden border border-slate-700 animate-fade-in">
+                            <pre className="text-[10px] text-emerald-400 font-mono overflow-auto max-h-64 whitespace-pre-wrap">
+                                {getSqlScript()}
+                            </pre>
+                        </div>
+                     )}
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="block text-slate-500 text-xs uppercase font-bold">URL do Projeto</span>
+                        <span className="font-mono text-slate-700">{supabaseConfig.supabaseUrl}</span>
                       </div>
                       <div>
-                          <h3 className="text-lg font-bold text-slate-900">
-                              {editingUserId ? 'Editar Usuário' : 'Gerenciar Usuários'}
-                          </h3>
-                          <p className="text-sm text-slate-500">
-                              {editingUserId ? 'Atualize os dados abaixo.' : 'Cadastre novos usuários para acessar o sistema.'}
-                          </p>
+                        <span className="block text-slate-500 text-xs uppercase font-bold">Status</span>
+                        <span className="text-green-600 font-bold flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-green-500"></span> Online
+                        </span>
                       </div>
-                   </div>
-                   {editingUserId && (
-                       <Button variant="secondary" size="sm" onClick={resetUserForm}>
-                           <X className="w-4 h-4 mr-2" /> Cancelar Edição
-                       </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="danger" onClick={handleClearCloudConfig}>
+                      <CloudOff className="w-4 h-4 mr-2" />
+                      Desconectar
+                    </Button>
+                    <div className="flex gap-2">
+                         <Button variant="outline" onClick={() => setShowSqlPreview(!showSqlPreview)}>
+                           {showSqlPreview ? <EyeOff className="w-4 h-4 mr-2" /> : <Database className="w-4 h-4 mr-2" />}
+                           {showSqlPreview ? 'Ocultar SQL' : 'Ver SQL'}
+                         </Button>
+                         <Button variant="outline" onClick={copySql}>
+                            <Copy className="w-4 h-4 mr-2" />
+                            Copiar
+                         </Button>
+                    </div>
+                  </div>
+
+                  {showSqlPreview && (
+                        <div className="mt-4 bg-slate-800 rounded-lg p-4 overflow-hidden border border-slate-700 animate-fade-in">
+                            <div className="flex justify-between items-center mb-2 border-b border-slate-700 pb-2">
+                                <span className="text-slate-400 text-xs font-mono">setup_database.sql</span>
+                                <span className="text-xs text-emerald-500">v18</span>
+                            </div>
+                            <pre className="text-xs text-emerald-300 font-mono overflow-auto max-h-80 whitespace-pre-wrap">
+                                {getSqlScript()}
+                            </pre>
+                        </div>
                    )}
                 </div>
-
-                <div className="p-8">
-                    <form onSubmit={handleRegisterOrUpdateUser} className="max-w-md mx-auto space-y-5">
-                         {userMsg && (
-                            <div className={`p-3 rounded-lg text-sm border flex items-center gap-2 ${userMsg.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                                {userMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
-                                {userMsg.text}
-                            </div>
-                         )}
-
-                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
-                            <input
-                              type="text"
-                              required
-                              value={newUserName}
-                              onChange={(e) => setNewUserName(e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                              placeholder="Ex: João da Silva"
-                            />
-                        </div>
-
-                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Login (Usuário)</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <User className="h-5 w-5 text-slate-400" />
-                                </div>
-                                <input
-                                type="text"
-                                required
-                                value={newUserLogin}
-                                onChange={(e) => setNewUserLogin(e.target.value)}
-                                className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                                placeholder="joao.silva"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">
-                                {editingUserId ? 'Nova Senha' : 'Senha'}
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock className="h-5 w-5 text-slate-400" />
-                                </div>
-                                <input
-                                type="text"
-                                required={!editingUserId}
-                                value={newUserPass}
-                                onChange={(e) => setNewUserPass(e.target.value)}
-                                className="pl-10 w-full rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                                placeholder={editingUserId ? "Deixe visível para alterar" : "******"}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <label className="flex items-center gap-3 cursor-pointer">
-                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${newUserIsAdmin ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
-                                {newUserIsAdmin && <ShieldCheck className="w-3.5 h-3.5 text-white" />}
-                            </div>
-                            <input 
-                                type="checkbox" 
-                                className="hidden"
-                                checked={newUserIsAdmin}
-                                onChange={(e) => setNewUserIsAdmin(e.target.checked)}
-                            />
-                            <div>
-                                <span className="block text-sm font-medium text-slate-900">Perfil de Administrador</span>
-                                <span className="block text-xs text-slate-500">Acesso total às configurações e áreas restritas.</span>
-                            </div>
-                            </label>
-                        </div>
-
-                        <Button type="submit" className="w-full" disabled={isRegistering}>
-                            {isRegistering ? (
-                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {editingUserId ? 'Atualizando...' : 'Salvando...'}</>
-                            ) : (
-                                <>{editingUserId ? <Save className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />} {editingUserId ? 'Atualizar Usuário' : 'Cadastrar Usuário'}</>
-                            )}
-                        </Button>
-                    </form>
-                </div>
-
-                {/* Users List */}
-                <div className="border-t border-slate-200 p-8 bg-slate-50">
-                   <div className="flex items-center justify-between mb-4">
-                      <h4 className="font-bold text-slate-800">Usuários Cadastrados ({usersList.length})</h4>
-                      <Button variant="outline" size="sm" onClick={loadUsers} disabled={isLoadingUsers}>
-                          <RefreshCw className={`w-4 h-4 ${isLoadingUsers ? 'animate-spin' : ''}`} />
-                      </Button>
-                   </div>
-                   
-                   <div className="space-y-3">
-                      {usersList.length === 0 && !isLoadingUsers && (
-                          <p className="text-center text-slate-500 text-sm py-4">Nenhum usuário encontrado.</p>
-                      )}
-                      
-                      {usersList.map(user => (
-                          <div key={user.id} className={`bg-white p-4 rounded-lg border flex items-center justify-between shadow-sm transition-colors ${editingUserId === user.id ? 'border-indigo-500 ring-1 ring-indigo-200' : 'border-slate-200'}`}>
-                              <div className="flex items-center gap-3">
-                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
-                                      {user.role === 'admin' ? <ShieldCheck className="w-5 h-5" /> : <User className="w-5 h-5" />}
-                                  </div>
-                                  <div>
-                                      <p className="font-bold text-slate-900">{user.name} {user.id === currentUser?.id && <span className="text-xs text-slate-400 font-normal">(Você)</span>}</p>
-                                      <p className="text-xs text-slate-500 font-mono">@{user.username}</p>
-                                  </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                  <button 
-                                      onClick={() => handleEditUser(user)}
-                                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                      title="Editar"
-                                  >
-                                      <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  {user.id !== currentUser?.id && (
-                                      <button 
-                                          onClick={() => handleDeleteUser(user.id)}
-                                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                          title="Excluir"
-                                      >
-                                          <Trash2 className="w-4 h-4" />
-                                      </button>
-                                  )}
-                              </div>
-                          </div>
-                      ))}
-                   </div>
-                </div>
+              )}
             </div>
+          </div>
         </div>
       )}
 
+      {/* --- TESTING TAB --- */}
       {isAdmin && activeTab === 'testing' && (
-         <div className="max-w-4xl mx-auto space-y-6">
-           <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
-              <div className="flex items-start gap-4 mb-6">
+         <div className="space-y-6">
+             <div className="flex items-center gap-3 mb-6">
                  <div className="p-3 bg-orange-100 rounded-full text-orange-600">
                     <Beaker className="w-6 h-6" />
                  </div>
                  <div>
-                    <h3 className="text-lg font-bold text-orange-900">Configuração do Ambiente de Testes</h3>
-                    <p className="text-sm text-orange-700 mt-1">
-                       Configure um projeto secundário do Supabase para testar novas funcionalidades sem afetar os dados reais.
-                    </p>
+                    <h3 className="text-lg font-bold text-slate-900">Ambiente de Testes (Sandbox)</h3>
+                    <p className="text-sm text-slate-500">Configure um banco de dados separado para testes seguros.</p>
                  </div>
-              </div>
+            </div>
 
-              <div className="flex flex-col md:flex-row gap-6">
-                 <form onSubmit={(e) => handleSaveCloudConfig(e, 'test')} className="space-y-4 flex-1">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Project URL (Testes)</label>
-                        <input 
-                            type="text" 
-                            value={testConfig.supabaseUrl}
-                            onChange={(e) => setTestConfig({...testConfig, supabaseUrl: e.target.value})}
-                            className="w-full rounded-md border-orange-200 shadow-sm p-2 border focus:ring-orange-500 focus:border-orange-500 bg-white"
-                            placeholder="https://test-project.supabase.co"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">API Key (Testes)</label>
-                        <input 
-                            type="password" 
-                            value={testConfig.supabaseKey}
-                            onChange={(e) => setTestConfig({...testConfig, supabaseKey: e.target.value})}
-                            className="w-full rounded-md border-orange-200 shadow-sm p-2 border focus:ring-orange-500 focus:border-orange-500 bg-white"
-                            placeholder="Key do projeto de testes..."
-                        />
-                    </div>
-                    <Button type="submit" disabled={isTesting} className="bg-orange-600 hover:bg-orange-700 text-white w-full">
-                         {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                         Salvar Configuração de Testes
-                    </Button>
-                 </form>
-
-                 <div className="flex-1 bg-white p-4 rounded-lg border border-orange-100 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <h4 className="font-semibold text-slate-800 mb-2">Alternar Ambiente</h4>
-                      <p className="text-sm text-slate-500 mb-4">
-                        O ambiente atual é: <strong>{currentEnv === 'prod' ? 'PRODUÇÃO' : 'TESTES'}</strong>.
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <button 
-                        onClick={() => handleSwitchEnv('test')}
-                        disabled={currentEnv === 'test'}
-                        className={`w-full p-3 rounded-lg border text-left flex items-center gap-3 transition-colors ${currentEnv === 'test' ? 'bg-orange-100 border-orange-300 text-orange-800 opacity-50 cursor-default' : 'bg-white hover:bg-orange-50 border-slate-200 text-slate-700'}`}
-                      >
-                         <div className={`w-4 h-4 rounded-full border ${currentEnv === 'test' ? 'bg-orange-500 border-orange-600' : 'bg-white border-slate-300'}`}></div>
-                         <div className="flex-1">
-                           <span className="block font-medium">Ambiente de Testes</span>
-                           <span className="text-xs text-slate-400">Dados fictícios e experimentos</span>
-                         </div>
-                      </button>
-
-                      <button 
-                         onClick={() => handleSwitchEnv('prod')}
-                         disabled={currentEnv === 'prod'}
-                         className={`w-full p-3 rounded-lg border text-left flex items-center gap-3 transition-colors ${currentEnv === 'prod' ? 'bg-emerald-100 border-emerald-300 text-emerald-800 opacity-50 cursor-default' : 'bg-white hover:bg-emerald-50 border-slate-200 text-slate-700'}`}
-                      >
-                         <div className={`w-4 h-4 rounded-full border ${currentEnv === 'prod' ? 'bg-emerald-500 border-emerald-600' : 'bg-white border-slate-300'}`}></div>
-                         <div className="flex-1">
-                           <span className="block font-medium">Ambiente de Produção</span>
-                           <span className="text-xs text-slate-400">Dados reais dos clientes</span>
-                         </div>
-                      </button>
-                    </div>
-                 </div>
-              </div>
-
-               {/* SQL Helper for Tests */}
-               <div className="bg-slate-800 text-slate-200 p-6 rounded-xl shadow-sm flex flex-col mt-6">
-                  <div className="flex items-center gap-2 mb-4 text-orange-400">
-                      <Database className="w-5 h-5" />
-                      <h3 className="font-bold">Setup do Banco de Testes</h3>
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+               <div className="flex justify-between items-center mb-6 pb-6 border-b border-slate-100">
+                  <div>
+                      <h4 className="font-bold text-slate-800">Status do Ambiente</h4>
+                      <p className="text-sm text-slate-500">Você está atualmente em: <strong className="uppercase">{currentEnv === 'prod' ? 'Produção' : 'Testes'}</strong></p>
                   </div>
-                  <p className="text-sm text-slate-400 mb-4">
-                      Crie um projeto novo no Supabase e rode o mesmo SQL de produção para garantir que o ambiente de testes seja idêntico.
-                  </p>
-                  <Button variant="secondary" onClick={copySql} className="self-start text-xs">
-                    <Copy className="w-3 h-3 mr-2" /> Copiar SQL de Setup
+                  <div className="flex gap-2">
+                      <Button 
+                         variant={currentEnv === 'prod' ? 'primary' : 'outline'} 
+                         onClick={() => handleSwitchEnv('prod')}
+                         className={currentEnv === 'prod' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                      >
+                         Produção
+                      </Button>
+                      <Button 
+                         variant={currentEnv === 'test' ? 'primary' : 'outline'} 
+                         onClick={() => handleSwitchEnv('test')}
+                         className={currentEnv === 'test' ? 'bg-orange-600 hover:bg-orange-700' : ''}
+                      >
+                         Testes
+                      </Button>
+                  </div>
+               </div>
+
+               <h4 className="font-bold text-slate-800 mb-4">Configuração do Banco de Testes</h4>
+               <form onSubmit={(e) => handleSaveCloudConfig(e, 'test')} className="space-y-4 max-w-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Test Project URL</label>
+                    <input 
+                      type="text" 
+                      value={testConfig.supabaseUrl}
+                      onChange={(e) => setTestConfig({...testConfig, supabaseUrl: e.target.value})}
+                      placeholder="https://test-project.supabase.co"
+                      className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Test Anon Key</label>
+                    <input 
+                      type="password" 
+                      value={testConfig.supabaseKey}
+                      onChange={(e) => setTestConfig({...testConfig, supabaseKey: e.target.value})}
+                      placeholder="eyJh..."
+                      className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
+                    />
+                  </div>
+                  
+                  {testResult && !testResult.success && activeTab === 'testing' && (
+                    <div className="p-3 bg-red-50 text-red-700 text-sm rounded border border-red-200 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      {testResult.message}
+                    </div>
+                  )}
+
+                  <Button type="submit" disabled={isTesting}>
+                    {isTesting ? 'Verificando...' : 'Salvar Configuração de Teste'}
                   </Button>
-              </div>
-           </div>
+               </form>
+            </div>
          </div>
       )}
-
-      {isAdmin && activeTab === 'cloud' && (
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className={`p-6 rounded-xl border ${isCloudConfigured ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'} shadow-sm`}>
-                <div className="flex items-center gap-3 mb-6">
-                    {isCloudConfigured ? (
-                        <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
-                            <Cloud className="w-6 h-6" />
-                        </div>
-                    ) : (
-                        <div className="p-3 bg-slate-100 rounded-full text-slate-400">
-                            <CloudOff className="w-6 h-6" />
-                        </div>
-                    )}
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-900">
-                            {isCloudConfigured ? 'Conectado (Produção)' : 'Conexão de Produção'}
-                        </h3>
-                        <p className="text-sm text-slate-500">
-                            Configuração oficial onde os pedidos reais são salvos.
-                        </p>
-                    </div>
-                </div>
-
-                <form onSubmit={(e) => handleSaveCloudConfig(e, 'prod')} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Project URL</label>
-                        <input 
-                            type="text" 
-                            value={supabaseConfig.supabaseUrl}
-                            onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseUrl: e.target.value})}
-                            className="w-full rounded-md border-slate-300 shadow-sm p-2 border bg-white"
-                            placeholder="https://xyz.supabase.co"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">API Key (public/anon)</label>
-                        <input 
-                            type="password" 
-                            value={supabaseConfig.supabaseKey}
-                            onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseKey: e.target.value})}
-                            className="w-full rounded-md border-slate-300 shadow-sm p-2 border bg-white"
-                            placeholder="eyJxh..."
-                            required
-                        />
-                    </div>
-
-                    {testResult && (
-                      <div className={`p-3 rounded-lg text-sm border ${testResult.success ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'} flex items-start gap-2`}>
-                        {testResult.success ? <CheckCircle className="w-5 h-5 flex-shrink-0" /> : <AlertTriangle className="w-5 h-5 flex-shrink-0" />}
-                        <div>
-                          <strong>{testResult.success ? 'Conexão bem sucedida!' : 'Falha na conexão:'}</strong>
-                          <p>{testResult.message || (testResult.success ? 'Conectado! Verifique o topo da página.' : '')}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="pt-4 border-t border-emerald-100/50 flex justify-end gap-3">
-                         {isCloudConfigured && (
-                            <Button type="button" variant="danger" onClick={handleClearCloudConfig}>
-                                Resetar Tudo
-                            </Button>
-                         )}
-                         <Button type="submit" disabled={isTesting}>
-                            {isTesting ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Testando...
-                              </>
-                            ) : (
-                              <>
-                                <Save className="w-4 h-4 mr-2" />
-                                Salvar Produção
-                              </>
-                            )}
-                         </Button>
-                    </div>
-                </form>
-            </div>
-
-            <div className="bg-slate-800 text-slate-200 p-6 rounded-xl shadow-sm flex flex-col">
-                <div className="flex items-center gap-2 mb-4 text-emerald-400">
-                    <Database className="w-5 h-5" />
-                    <h3 className="font-bold">Setup do Banco de Dados</h3>
-                </div>
-                
-                <p className="text-sm text-slate-400 mb-4">
-                    Copie o SQL abaixo e rode no Supabase para criar ou atualizar as tabelas.
-                </p>
-
-                <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 font-mono text-xs overflow-x-auto relative group flex-1">
-                    <pre className="text-emerald-300">
-{`-- SCRIPT COMPLETO (v16)
--- (Clique no botão copiar para ver tudo)
-CREATE TABLE IF NOT EXISTS public.customers (...);
--- RLS Habilitado e USER ADMIN CRIADO
-ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Access Orders" ON public.orders;
-CREATE POLICY "Public Access Orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
-INSERT INTO public.app_users (username, password, role) SELECT 'admin', 'passroot', 'admin' WHERE...;
-`}
-                    </pre>
-                    <button 
-                        onClick={copySql}
-                        className="absolute top-2 right-2 bg-slate-700 hover:bg-slate-600 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copiar SQL Completo"
-                    >
-                        <Copy className="w-4 h-4" />
-                    </button>
-                </div>
-                
-                <div className="mt-4 text-xs text-slate-500">
-                   * Este script é seguro para rodar várias vezes.
-                </div>
-            </div>
-        </div>
-      )}
-
+      
       {activeTab === 'products' && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Color Management */}
