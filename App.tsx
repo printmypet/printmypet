@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { LayoutDashboard, PlusCircle, Settings, ExternalLink, Database, Beaker, LogOut, User, Store } from 'lucide-react';
 import { Order, OrderStatus, PartsColors, DEFAULT_COLORS, DEFAULT_TEXTURES, SupabaseConfig, Texture, AppUser, ProductConfig } from './types';
@@ -43,6 +43,10 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); 
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [newOrderAlert, setNewOrderAlert] = useState(false);
+  
+  // Refs para controle de detecção de novos pedidos
+  const previousOrdersCount = useRef<number | null>(null);
   
   // Inicialização PREGUIÇOSA (Lazy) para garantir que o estado comece correto
   const [isTestMode, setIsTestMode] = useState(() => {
@@ -79,6 +83,24 @@ const App: React.FC = () => {
     }
     return DEFAULT_TEXTURES.map(t => ({ id: uuidv4(), name: t }));
   });
+
+  // Detecta novos pedidos chegando
+  useEffect(() => {
+    // Se é a primeira carga (null), apenas definimos o valor atual sem alertar
+    if (previousOrdersCount.current === null) {
+        if (orders.length > 0) {
+            previousOrdersCount.current = orders.length;
+        }
+        return;
+    }
+
+    // Se a quantidade aumentou, ativamos o alerta
+    if (orders.length > previousOrdersCount.current) {
+        setNewOrderAlert(true);
+    }
+
+    previousOrdersCount.current = orders.length;
+  }, [orders]);
 
   // Init Supabase and Load Data
   useEffect(() => {
@@ -444,6 +466,8 @@ const App: React.FC = () => {
                 onUpdateProducts={handleUpdateProducts}
                 onDelete={handleDeleteOrder}
                 onEdit={handleEditClick}
+                newOrderAlert={newOrderAlert}
+                onClearAlert={() => setNewOrderAlert(false)}
              />
           </div>
         )}

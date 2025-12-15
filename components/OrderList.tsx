@@ -1,7 +1,7 @@
 
 // @ts-nocheck
 import React, { useState } from 'react';
-import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck, AlertCircle, Check } from 'lucide-react';
+import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck, AlertCircle, Check, Bell } from 'lucide-react';
 import { Order, OrderStatus, ProductConfig } from '../types';
 import { Button } from './ui/Button';
 
@@ -12,6 +12,8 @@ interface OrderListProps {
   onUpdateProducts?: (id: string, products: ProductConfig[]) => void;
   onDelete: (id: string) => void;
   onEdit: (order: Order) => void;
+  newOrderAlert?: boolean;
+  onClearAlert?: () => void;
 }
 
 const statusColors: Record<OrderStatus, string> = {
@@ -24,7 +26,16 @@ const statusColors: Record<OrderStatus, string> = {
 
 type FilterType = 'open' | 'completed' | 'all';
 
-export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, onUpdatePaid, onUpdateProducts, onDelete, onEdit }) => {
+export const OrderList: React.FC<OrderListProps> = ({ 
+  orders, 
+  onUpdateStatus, 
+  onUpdatePaid, 
+  onUpdateProducts, 
+  onDelete, 
+  onEdit,
+  newOrderAlert,
+  onClearAlert
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('open');
   const [showOnlyPaid, setShowOnlyPaid] = useState(false);
@@ -93,6 +104,28 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
 
   return (
     <div className="space-y-6">
+      
+      {/* New Order Alert Banner */}
+      {newOrderAlert && (
+        <div className="bg-indigo-600 rounded-xl shadow-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in-up border border-indigo-500">
+            <div className="flex items-center gap-3 text-white">
+                <div className="bg-white/20 p-2 rounded-full animate-bounce">
+                    <Bell className="w-6 h-6" />
+                </div>
+                <div>
+                    <h4 className="font-bold text-lg">Novo Pedido Recebido!</h4>
+                    <p className="text-indigo-100 text-sm">Atualize a lista ou verifique os itens pendentes.</p>
+                </div>
+            </div>
+            <button 
+                onClick={onClearAlert}
+                className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-50 transition-colors shadow-sm whitespace-nowrap"
+            >
+                Entendido
+            </button>
+        </div>
+      )}
+
       <div className="flex flex-col gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h2 className="text-2xl font-bold text-slate-800">
