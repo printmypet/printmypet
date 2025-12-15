@@ -102,6 +102,19 @@ export const CatalogManager: React.FC = () => {
     fileInputRef.current?.click();
   };
 
+  // --- Price Mask Handler ---
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/\D/g, '');
+    if (rawValue === '') {
+        setNewItem({ ...newItem, price: '' });
+        return;
+    }
+    const value = parseInt(rawValue, 10) / 100;
+    // Formata para 0.000,00
+    const formatted = value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    setNewItem({ ...newItem, price: formatted });
+  };
+
   // --- Product Handlers ---
   const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,10 +122,13 @@ export const CatalogManager: React.FC = () => {
 
     setSubmitting(true);
     try {
+      // Limpa a formatação: remove pontos de milhar e troca vírgula por ponto
+      const cleanPrice = parseFloat(newItem.price.replace(/\./g, '').replace(',', '.'));
+
       await addCatalogProduct({
         name: newItem.name,
         description: newItem.description,
-        price: parseFloat(newItem.price.replace(',', '.')),
+        price: cleanPrice,
         imageUrl: newItem.imageUrl,
         category: newItem.category || (categories[0]?.name || 'Geral'),
         subcategory: newItem.subcategory,
@@ -262,9 +278,10 @@ export const CatalogManager: React.FC = () => {
                   <div className="relative">
                       <DollarSign className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
                       <input 
-                          type="text" 
+                          type="text"
+                          inputMode="numeric"
                           value={newItem.price}
-                          onChange={e => setNewItem({...newItem, price: e.target.value})}
+                          onChange={handlePriceChange}
                           className="w-full rounded-lg border-slate-300 border p-2 pl-8 text-sm bg-white"
                           placeholder="0,00"
                           required
