@@ -115,7 +115,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm h-16">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
             <div className="flex items-center gap-2 font-logo select-none cursor-pointer" onClick={() => { setSelectedCategory('Todos'); setSelectedSubcategory(null); window.scrollTo(0,0); }}>
-               <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">P</div>
                <span className="text-xl font-bold text-slate-900 tracking-tight">PrintMy<span className="text-sky-500">[]</span>3D</span>
             </div>
 
@@ -395,7 +394,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
               <div>
                   <div className="flex items-center gap-2 font-logo select-none mb-4">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">P</div>
                     <span className="text-xl font-bold text-white tracking-tight">PrintMy<span className="text-sky-500">[]</span>3D</span>
                   </div>
                   <p className="text-sm leading-relaxed mb-4">
