@@ -217,7 +217,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                             alt="Banner" 
                             className="w-full h-full object-cover"
                          />
-                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30"></div>
+                         {/* Removed dark overlay as requested */}
                      </div>
                  ))}
              </div>

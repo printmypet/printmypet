@@ -729,7 +729,7 @@ export const CatalogManager: React.FC = () => {
                          <img 
                             src={resolveImagePath(`banners/${banner.imageUrl}`)} 
                             alt="Banner Preview" 
-                            className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity"
+                            className="absolute inset-0 w-full h-full object-cover"
                          />
                          
                          <div className="absolute inset-0 flex items-center justify-between p-6 pointer-events-none">
