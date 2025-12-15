@@ -72,6 +72,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
     return true;
   });
 
+  // Helper para resolver caminho da imagem (remove barra inicial se existir)
+  const resolveImagePath = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    return path.startsWith('/') ? path.slice(1) : path;
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       
@@ -285,7 +292,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
                     <div key={product.id} className="group bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col">
                         <div className="relative h-48 bg-slate-100 overflow-hidden">
                             {product.imageUrl ? (
-                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                <img src={resolveImagePath(product.imageUrl)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">
                                     <ShoppingBag className="w-10 h-10 opacity-20" />

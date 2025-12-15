@@ -91,15 +91,21 @@ export const CatalogManager: React.FC = () => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      // Assume o arquivo está na raiz da pasta public
-      // Se estiver em uma subpasta (ex: /img/), o usuário pode editar o texto depois
-      const relativePath = `/${file.name}`;
+      // Salva apenas o nome do arquivo. Como o base="./", o navegador buscará na mesma pasta do index.html (raiz do dist)
+      const relativePath = file.name;
       setNewItem(prev => ({ ...prev, imageUrl: relativePath }));
     }
   };
 
   const triggerFileBrowser = () => {
     fileInputRef.current?.click();
+  };
+
+  // Helper para resolver caminho da imagem (remove barra inicial se existir para compatibilidade com base: ./)
+  const resolveImagePath = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    return path.startsWith('/') ? path.slice(1) : path;
   };
 
   // --- Price Mask Handler ---
@@ -296,7 +302,7 @@ export const CatalogManager: React.FC = () => {
                           value={newItem.imageUrl}
                           onChange={e => setNewItem({...newItem, imageUrl: e.target.value})}
                           className="flex-1 rounded-lg border-slate-300 border p-2 text-sm bg-white"
-                          placeholder="/nome-do-arquivo.jpg"
+                          placeholder="nome-do-arquivo.jpg"
                       />
                       <input 
                           type="file" 
@@ -311,12 +317,12 @@ export const CatalogManager: React.FC = () => {
                       </Button>
                       {newItem.imageUrl && (
                           <div className="w-10 h-10 rounded border border-slate-200 bg-slate-50 overflow-hidden shrink-0">
-                              <img src={newItem.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                              <img src={resolveImagePath(newItem.imageUrl)} alt="Preview" className="w-full h-full object-cover" />
                           </div>
                       )}
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">
-                      * O arquivo deve existir fisicamente na pasta "public" do servidor.
+                      * O arquivo deve existir fisicamente na pasta "public" do projeto.
                   </p>
               </div>
               <div className="md:col-span-2">
@@ -391,7 +397,7 @@ export const CatalogManager: React.FC = () => {
                   <div key={product.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
                       <div className="h-40 bg-slate-100 relative">
                           {product.imageUrl ? (
-                              <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                              <img src={resolveImagePath(product.imageUrl)} alt={product.name} className="w-full h-full object-cover" />
                           ) : (
                               <div className="w-full h-full flex items-center justify-center text-slate-300">
                                   <ImageIcon className="w-8 h-8" />
