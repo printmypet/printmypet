@@ -324,8 +324,24 @@ export const updateFilamentQuantity = async (id: string, quantity: number) => {
 export const fetchCategories = async (): Promise<Category[]> => {
   if (!supabase) return [];
   
-  // 1. Fetch Categories
-  const { data: categories, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
+  // 1. Fetch Categories - Sorted by Position then CreatedAt
+  // Try with position first
+  let { data: categories, error } = await supabase
+    .from('categories')
+    .select('*')
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  // If column doesn't exist (42703), fallback to default sort
+  if (error && error.code === '42703') {
+      const retry = await supabase
+        .from('categories')
+        .select('*')
+        .order('created_at', { ascending: true });
+      categories = retry.data;
+      error = retry.error;
+  }
+
   if (error) {
      if (error.code !== '42P01') console.error("Error fetching categories:", error.message);
      return [];
@@ -345,9 +361,10 @@ export const fetchCategories = async (): Promise<Category[]> => {
   }
 
   // 3. Map together
-  return categories.map((cat: any) => ({
+  return (categories || []).map((cat: any) => ({
       id: cat.id,
       name: cat.name,
+      position: cat.position,
       subcategories: subcategories 
         ? subcategories
             .filter((sub: any) => sub.category_id === cat.id)
@@ -358,7 +375,8 @@ export const fetchCategories = async (): Promise<Category[]> => {
 
 export const addCategory = async (name: string) => {
   if (!supabase) return;
-  const { error } = await supabase.from('categories').insert([{ name }]);
+  // Position 9999 ensures it goes to the end
+  const { error } = await supabase.from('categories').insert([{ name, position: 9999 }]);
   if (error) throw error;
 };
 
@@ -366,6 +384,17 @@ export const updateCategory = async (id: string, name: string) => {
   if (!supabase) return;
   const { error } = await supabase.from('categories').update({ name }).eq('id', id);
   if (error) throw error;
+};
+
+export const updateCategoryPositions = async (categories: Category[]) => {
+  if (!supabase) return;
+  
+  for (let i = 0; i < categories.length; i++) {
+    const cat = categories[i];
+    if (cat.id) {
+      await supabase.from('categories').update({ position: i }).eq('id', cat.id);
+    }
+  }
 };
 
 export const deleteCategory = async (id: string) => {
@@ -404,12 +433,16 @@ export const fetchBanners = async (): Promise<Banner[]> => {
      if (error.code !== '42P01') console.error("Error fetching banners:", error.message);
      return [];
   }
-  return data;
+  
+  return data.map((b: any) => ({
+      id: b.id,
+      imageUrl: b.image_url || ''
+  }));
 };
 
-export const addBanner = async (banner: Omit<Banner, 'id'>) => {
+export const addBanner = async (banner: { imageUrl: string }) => {
   if (!supabase) return;
-  const { error } = await supabase.from('banners').insert([banner]);
+  const { error } = await supabase.from('banners').insert([{ image_url: banner.imageUrl }]);
   if (error) throw error;
 };
 

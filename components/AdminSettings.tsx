@@ -463,7 +463,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const getSqlScript = () => {
     return [
-      "-- SCRIPT COMPLETO (v19 - SUBCATEGORIAS)",
+      "-- SCRIPT COMPLETO (v21 - BANNERS COM IMAGEM)",
       
       "-- 1. Tabelas de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
@@ -508,8 +508,11 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
       "-- 8. Tabelas de Categorias, Subcategorias e Banners",
       "CREATE TABLE IF NOT EXISTS public.categories (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL UNIQUE);",
+      "ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS position integer DEFAULT 999;",
+      
       "CREATE TABLE IF NOT EXISTS public.subcategories (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, category_id uuid REFERENCES public.categories(id) ON DELETE CASCADE);",
-      "CREATE TABLE IF NOT EXISTS public.banners (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), title text NOT NULL, subtitle text, theme text DEFAULT 'blue');",
+      "CREATE TABLE IF NOT EXISTS public.banners (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), title text, subtitle text, theme text DEFAULT 'blue');",
+      "ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS image_url text;",
 
       "-- 9. Segurança RLS (Limpeza e Recriação)",
       
@@ -560,7 +563,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     navigator.clipboard.writeText(getSqlScript());
-    alert("SQL Completo (v19) copiado! Cole no SQL Editor do Supabase.");
+    alert("SQL Completo (v21) copiado! Cole no SQL Editor do Supabase.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = { base: 'Base', ball: 'Bola', top: 'Tampa/Topo' };
@@ -815,6 +818,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       {/* --- REPORTS TAB --- */}
       {isAdmin && activeTab === 'reports' && (
         <div className="space-y-6">
+          {/* ... (Code remains same for reports) ... */}
+          {/* ... (Including charts) ... */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Recebido</h4>
@@ -892,7 +897,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       {/* --- USERS TAB --- */}
       {isAdmin && activeTab === 'users' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* User Form */}
+            {/* ... (User management code same as before) ... */}
             <div className="lg:col-span-1">
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-24">
                     <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -966,7 +971,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                 </div>
             </div>
 
-            {/* User List */}
             <div className="lg:col-span-2">
                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                      <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
@@ -1039,15 +1043,20 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         </div>
       )}
 
+      {/* --- CLOUD & TESTING & PRODUCTS TAB --- */}
+      {/* ... (Remaining tabs code remains the same, assuming no changes needed there) ... */}
+      
       {/* --- CLOUD TAB --- */}
       {isAdmin && activeTab === 'cloud' && (
         <div className="max-w-2xl mx-auto space-y-6">
+          {/* ... Cloud config form ... */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
               <Cloud className="w-6 h-6 text-indigo-600" />
               Configuração da Nuvem (Supabase)
             </h3>
             
+            {/* ... Alerts ... */}
             {!isOnline && (
               <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex gap-3 items-start">
                 <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -1134,7 +1143,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         </div>
       )}
 
-      {/* --- TESTING TAB --- */}
       {isAdmin && activeTab === 'testing' && (
         <div className="max-w-2xl mx-auto space-y-6">
            <div className="bg-orange-50 border border-orange-200 p-6 rounded-xl text-center">
@@ -1209,6 +1217,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
         </div>
       )}
 
+      {/* ... Products/Colors/Textures Management ... */}
+      {/* ... code remains same ... */}
       {activeTab === 'products' && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Color Management */}

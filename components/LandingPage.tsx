@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Settings, ShoppingBag, Search, Menu, X, ArrowRight, Filter, ChevronDown, CheckCircle, Home } from 'lucide-react';
+import { Settings, ShoppingBag, Search, Menu, X, ArrowRight, Filter, ChevronDown, CheckCircle, Home, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CatalogProduct, Category, Banner, PartsColors, Order } from '../types';
 import { fetchCatalogProducts, fetchCategories, fetchBanners, addOrderToSupabase } from '../services/supabase';
 import { OrderForm } from './OrderForm';
@@ -47,27 +47,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
     setLoading(false);
   };
 
-  const getThemeGradient = (theme: string) => {
-      switch(theme) {
-          case 'purple': return 'from-purple-600 to-pink-600';
-          case 'blue': return 'from-indigo-600 to-sky-600';
-          default: return 'from-slate-700 to-slate-500';
-      }
-  };
-
   const activeBanners = banners.length > 0 ? banners : [
-    {
-       id: 'default-1',
-       title: "Transforme Ideias em Realidade",
-       subtitle: "Produtos exclusivos impressos em 3D com a mais alta qualidade.",
-       theme: 'blue'
-    },
-    {
-       id: 'default-2',
-       title: "Novos Itens de Decoração",
-       subtitle: "Modernize seu ambiente com peças geométricas e texturizadas.",
-       theme: 'purple'
-    }
+    // Fallback banner placeholder if none exist
+    { id: 'default', imageUrl: 'placeholder.jpg' } 
   ] as Banner[];
 
   const filteredProducts = products.filter(p => {
@@ -110,6 +92,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
   const handleBackToStore = () => {
       setView('store');
       setSelectedProduct(null);
+  };
+
+  const nextBanner = () => {
+      setCurrentBanner((prev) => (prev + 1) % activeBanners.length);
+  };
+
+  const prevBanner = () => {
+      setCurrentBanner((prev) => (prev - 1 + activeBanners.length) % activeBanners.length);
   };
 
 
@@ -297,36 +287,49 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
       </section>
 
       {/* --- HERO BANNER --- */}
-      <section className="relative h-[300px] md:h-[400px] bg-slate-900 overflow-hidden">
-         {/* Background Decoration */}
-         <div className="absolute inset-0">
-             <div className={`absolute -top-[50%] -left-[10%] w-[80%] h-[150%] rounded-full bg-gradient-to-br ${getThemeGradient(activeBanners[currentBanner].theme)} opacity-20 blur-[100px] transition-all duration-1000`}></div>
-             <div className="absolute top-[20%] -right-[10%] w-[60%] h-[100%] rounded-full bg-indigo-900/30 blur-[80px]"></div>
-         </div>
+      <section className="relative w-full h-[300px] md:h-[400px] bg-slate-900 overflow-hidden group">
+         {/* Banner Image */}
+         {activeBanners.length > 0 && (
+             <div className="absolute inset-0">
+                 <img 
+                    src={resolveImagePath(`banners/${activeBanners[currentBanner].imageUrl}`)} 
+                    alt="Banner" 
+                    className="w-full h-full object-cover animate-fade-in"
+                    key={activeBanners[currentBanner].id} // Force re-render for animation
+                 />
+                 {/* Optional Dark Overlay if image is missing or for style */}
+                 <div className="absolute inset-0 bg-black/10"></div>
+             </div>
+         )}
 
-         <div className="relative z-10 max-w-7xl mx-auto px-4 h-full flex flex-col justify-center items-start">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 max-w-2xl leading-tight drop-shadow-lg">
-                {activeBanners[currentBanner].title}
-            </h1>
-            <p className="text-slate-300 text-lg md:text-xl max-w-xl mb-8 font-light">
-                {activeBanners[currentBanner].subtitle}
-            </p>
-            <button className="bg-white text-slate-900 font-bold px-8 py-3 rounded-full hover:bg-sky-50 transition-colors shadow-lg flex items-center gap-2 group">
-                Ver Produtos
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-         </div>
-
-         {/* Banner Controls */}
-         <div className="absolute bottom-4 right-4 flex gap-2 z-20">
-             {activeBanners.map((_, idx) => (
+         {/* Navigation Arrows */}
+         {activeBanners.length > 1 && (
+             <>
                  <button 
-                    key={idx}
-                    onClick={() => setCurrentBanner(idx)} 
-                    className={`w-3 h-3 rounded-full transition-all ${currentBanner === idx ? 'bg-white w-6' : 'bg-white/30'}`}
-                 ></button>
-             ))}
-         </div>
+                    onClick={prevBanner}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-slate-800 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-110 opacity-0 group-hover:opacity-100"
+                 >
+                     <ChevronLeft className="w-6 h-6" />
+                 </button>
+                 <button 
+                    onClick={nextBanner}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-slate-800 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-110 opacity-0 group-hover:opacity-100"
+                 >
+                     <ChevronRight className="w-6 h-6" />
+                 </button>
+                 
+                 {/* Indicators */}
+                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                     {activeBanners.map((_, idx) => (
+                         <button 
+                            key={idx}
+                            onClick={() => setCurrentBanner(idx)} 
+                            className={`w-2.5 h-2.5 rounded-full transition-all shadow-sm ${currentBanner === idx ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/80'}`}
+                         ></button>
+                     ))}
+                 </div>
+             </>
+         )}
       </section>
 
       {/* --- PRODUCT SHOWCASE --- */}

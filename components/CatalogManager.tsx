@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Tag, DollarSign, Image as ImageIcon, Loader2, ShoppingBag, LayoutTemplate, Layers, FolderOpen, ArrowRight, X, Edit2, Check } from 'lucide-react';
+import { Plus, Trash2, Tag, DollarSign, Image as ImageIcon, Loader2, ShoppingBag, LayoutTemplate, Layers, FolderOpen, ArrowRight, X, Edit2, Check, GripVertical } from 'lucide-react';
 import { Button } from './ui/Button';
 import { CatalogProduct, Category, Banner } from '../types';
 import { 
@@ -11,6 +11,7 @@ import {
   fetchCategories,
   addCategory,
   updateCategory,
+  updateCategoryPositions,
   deleteCategory,
   fetchBanners,
   addBanner,
@@ -35,6 +36,7 @@ export const CatalogManager: React.FC = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSubcategoryName, setNewSubcategoryName] = useState('');
   const [addingSubToCategory, setAddingSubToCategory] = useState<string | null>(null);
+  const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
   
   // Inline Editing State for Categories/Subcategories
   const [editingCategory, setEditingCategory] = useState<{id: string, name: string} | null>(null);
@@ -43,11 +45,7 @@ export const CatalogManager: React.FC = () => {
 
   // Banners State
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [newBanner, setNewBanner] = useState<{title: string, subtitle: string, theme: 'blue' | 'purple' | 'dark'}>({
-    title: '',
-    subtitle: '',
-    theme: 'blue'
-  });
+  const [newBannerImage, setNewBannerImage] = useState('');
 
   const [newItem, setNewItem] = useState<{
     name: string;
@@ -230,6 +228,38 @@ export const CatalogManager: React.FC = () => {
     }
   };
 
+  // --- Category Drag & Drop ---
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    setDraggedCategoryIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedCategoryIndex === null || draggedCategoryIndex === dropIndex) return;
+    
+    const newCategories = [...categories];
+    const [movedCategory] = newCategories.splice(draggedCategoryIndex, 1);
+    newCategories.splice(dropIndex, 0, movedCategory);
+    
+    setCategories(newCategories); // Optimistic update
+    setDraggedCategoryIndex(null);
+    
+    try {
+       await updateCategoryPositions(newCategories);
+    } catch (err) {
+       console.error("Failed to update category positions in DB", err);
+       alert("Erro ao salvar ordem das categorias.");
+       loadCategories(); // Revert on error
+    }
+  };
+
   // --- Subcategory Handlers ---
   const handleAddSubcategory = async (e: React.FormEvent, categoryId: string) => {
     e.preventDefault();
@@ -262,10 +292,10 @@ export const CatalogManager: React.FC = () => {
   // --- Banner Handlers ---
   const handleAddBanner = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(!newBanner.title) return;
+    if(!newBannerImage) return;
     try {
-      await addBanner(newBanner);
-      setNewBanner({ title: '', subtitle: '', theme: 'blue' });
+      await addBanner({ imageUrl: newBannerImage });
+      setNewBannerImage('');
       loadBanners();
     } catch(e) { alert("Erro ao criar banner"); }
   };
@@ -536,27 +566,42 @@ export const CatalogManager: React.FC = () => {
             </div>
 
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                 <h4 className="font-semibold text-slate-800 mb-4">Categorias & Subcategorias</h4>
+                 <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-semibold text-slate-800">Categorias & Subcategorias</h4>
+                    <span className="text-xs text-indigo-500 bg-indigo-50 px-2 py-1 rounded">Arraste para ordenar</span>
+                 </div>
                  <div className="space-y-4">
                     {categories.length === 0 && <p className="text-sm text-slate-500">Nenhuma categoria encontrada.</p>}
-                    {categories.map(cat => (
-                        <div key={cat.id} className="bg-slate-50 rounded-lg border border-slate-100 p-3">
+                    {categories.map((cat, index) => (
+                        <div 
+                            key={cat.id} 
+                            className={`bg-slate-50 rounded-lg border p-3 transition-all ${draggedCategoryIndex === index ? 'opacity-50 border-dashed border-indigo-400' : 'border-slate-100 hover:border-indigo-200'}`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, index)}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, index)}
+                        >
                             <div className="flex items-center justify-between mb-2">
-                                {editingCategory?.id === cat.id ? (
-                                    <form onSubmit={handleUpdateCategory} className="flex items-center gap-2 flex-1 mr-2">
-                                        <input 
-                                            type="text" 
-                                            value={editingCategory.name}
-                                            onChange={e => setEditingCategory({...editingCategory, name: e.target.value})}
-                                            className="flex-1 text-sm p-1 rounded border border-indigo-300 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                            autoFocus
-                                        />
-                                        <button type="submit" className="text-green-600 hover:bg-green-50 p-1 rounded"><Check className="w-4 h-4"/></button>
-                                        <button type="button" onClick={() => setEditingCategory(null)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X className="w-4 h-4"/></button>
-                                    </form>
-                                ) : (
-                                    <span className="font-bold text-slate-800">{cat.name}</span>
-                                )}
+                                <div className="flex items-center gap-2 flex-1">
+                                    <div className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-indigo-400">
+                                        <GripVertical className="w-4 h-4" />
+                                    </div>
+                                    {editingCategory?.id === cat.id ? (
+                                        <form onSubmit={handleUpdateCategory} className="flex items-center gap-2 flex-1 mr-2">
+                                            <input 
+                                                type="text" 
+                                                value={editingCategory.name}
+                                                onChange={e => setEditingCategory({...editingCategory, name: e.target.value})}
+                                                className="flex-1 text-sm p-1 rounded border border-indigo-300 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                autoFocus
+                                            />
+                                            <button type="submit" className="text-green-600 hover:bg-green-50 p-1 rounded"><Check className="w-4 h-4"/></button>
+                                            <button type="button" onClick={() => setEditingCategory(null)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X className="w-4 h-4"/></button>
+                                        </form>
+                                    ) : (
+                                        <span className="font-bold text-slate-800">{cat.name}</span>
+                                    )}
+                                </div>
                                 
                                 <div className="flex items-center gap-2">
                                     {!editingCategory && (
@@ -654,41 +699,25 @@ export const CatalogManager: React.FC = () => {
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                 <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                    <LayoutTemplate className="w-4 h-4" /> Novo Banner
+                    <LayoutTemplate className="w-4 h-4" /> Novo Banner (Imagem)
                 </h4>
-                <form onSubmit={handleAddBanner} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div className="md:col-span-1">
-                        <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Título</label>
-                        <input 
-                           type="text"
-                           value={newBanner.title}
-                           onChange={e => setNewBanner({...newBanner, title: e.target.value})}
-                           className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
-                           required
-                        />
+                <form onSubmit={handleAddBanner} className="flex gap-4 items-end">
+                    <div className="flex-1">
+                        <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Nome do Arquivo</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-slate-400 text-sm">banners/</span>
+                            <input 
+                               type="text"
+                               value={newBannerImage}
+                               onChange={e => setNewBannerImage(e.target.value)}
+                               className="w-full rounded-lg border-slate-300 border p-2 pl-20 text-sm bg-white"
+                               placeholder="promo-natal.png"
+                               required
+                            />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">A imagem deve estar na pasta "public/banners" do projeto.</p>
                     </div>
-                    <div className="md:col-span-1">
-                        <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Subtítulo</label>
-                        <input 
-                           type="text"
-                           value={newBanner.subtitle}
-                           onChange={e => setNewBanner({...newBanner, subtitle: e.target.value})}
-                           className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
-                        />
-                    </div>
-                    <div className="md:col-span-1">
-                        <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Tema (Cor)</label>
-                        <select
-                           value={newBanner.theme}
-                           onChange={e => setNewBanner({...newBanner, theme: e.target.value as any})}
-                           className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
-                        >
-                            <option value="blue">Azul / Indigo</option>
-                            <option value="purple">Roxo / Rosa</option>
-                            <option value="dark">Escuro / Slate</option>
-                        </select>
-                    </div>
-                    <div className="md:col-span-1">
+                    <div className="w-32">
                         <Button type="submit" className="w-full">Adicionar</Button>
                     </div>
                 </form>
@@ -696,21 +725,25 @@ export const CatalogManager: React.FC = () => {
 
             <div className="grid grid-cols-1 gap-4">
                  {banners.map(banner => (
-                     <div key={banner.id} className="relative overflow-hidden rounded-xl bg-slate-900 p-6 flex items-center justify-between border border-slate-700">
-                         {/* Visual Preview Background */}
-                         <div className="absolute inset-0 pointer-events-none opacity-50">
-                             <div className={`absolute -top-10 -left-10 w-32 h-32 rounded-full blur-3xl ${banner.theme === 'purple' ? 'bg-purple-600' : banner.theme === 'blue' ? 'bg-indigo-600' : 'bg-slate-600'}`}></div>
-                         </div>
+                     <div key={banner.id} className="relative overflow-hidden rounded-xl bg-slate-900 border border-slate-700 h-32 group">
+                         <img 
+                            src={resolveImagePath(`banners/${banner.imageUrl}`)} 
+                            alt="Banner Preview" 
+                            className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity"
+                         />
                          
-                         <div className="relative z-10">
-                             <h3 className="text-xl font-bold text-white">{banner.title}</h3>
-                             <p className="text-slate-300">{banner.subtitle}</p>
-                             <span className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-800 px-2 py-0.5 rounded mt-2 inline-block">Tema: {banner.theme}</span>
-                         </div>
+                         <div className="absolute inset-0 flex items-center justify-between p-6 pointer-events-none">
+                             <div className="z-10 bg-black/50 p-2 rounded text-white">
+                                 <p className="text-xs font-mono">banners/{banner.imageUrl}</p>
+                             </div>
 
-                         <button onClick={() => handleDeleteBanner(banner.id)} className="relative z-10 p-2 bg-slate-800 hover:bg-red-900/50 text-slate-400 hover:text-red-400 rounded-lg transition-colors border border-slate-700">
-                             <Trash2 className="w-5 h-5" />
-                         </button>
+                             <button 
+                                onClick={() => handleDeleteBanner(banner.id)} 
+                                className="pointer-events-auto z-10 p-2 bg-slate-800/80 hover:bg-red-900/90 text-slate-400 hover:text-red-400 rounded-lg transition-colors border border-slate-600 backdrop-blur-sm"
+                             >
+                                 <Trash2 className="w-5 h-5" />
+                             </button>
+                         </div>
                      </div>
                  ))}
                  {banners.length === 0 && (

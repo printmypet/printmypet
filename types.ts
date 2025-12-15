@@ -64,14 +64,13 @@ export interface Subcategory {
 export interface Category {
   id: string;
   name: string;
+  position?: number; // New field for ordering
   subcategories?: Subcategory[];
 }
 
 export interface Banner {
   id: string;
-  title: string;
-  subtitle: string;
-  theme: 'blue' | 'purple' | 'dark'; // Simplified theme selection
+  imageUrl: string;
 }
 
 export interface CatalogProduct {
