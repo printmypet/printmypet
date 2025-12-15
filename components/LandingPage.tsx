@@ -201,16 +201,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* --- HERO BANNER --- */}
       <section className="relative w-full aspect-[21/10] sm:aspect-[4/1] md:aspect-[5/1] bg-slate-900 overflow-hidden group">
-         {/* Banner Image */}
+         {/* Banner Slider Track */}
          {activeBanners.length > 0 ? (
-             <div className="absolute inset-0">
-                 <img 
-                    src={resolveImagePath(`banners/${activeBanners[currentBanner].imageUrl}`)} 
-                    alt="Banner" 
-                    className="w-full h-full object-cover animate-fade-in"
-                    key={activeBanners[currentBanner].id} // Force re-render for animation
-                 />
-                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30"></div>
+             <div 
+                className="w-full h-full flex transition-transform duration-700 ease-in-out will-change-transform"
+                style={{ transform: `translateX(-${currentBanner * 100}%)` }}
+             >
+                 {activeBanners.map((banner) => (
+                     <div key={banner.id} className="min-w-full h-full relative">
+                         <img 
+                            src={resolveImagePath(`banners/${banner.imageUrl}`)} 
+                            alt="Banner" 
+                            className="w-full h-full object-cover"
+                         />
+                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30"></div>
+                     </div>
+                 ))}
              </div>
          ) : (
              <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 to-slate-900 flex items-center justify-center">
@@ -250,7 +256,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
              </>
          )}
          
-         {/* Hero CTA Content (Overlay) */}
+         {/* Hero CTA Content (Overlay) - Keeps static while images slide behind */}
          {activeBanners.length > 0 && (
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                 <div className="text-center px-4">
