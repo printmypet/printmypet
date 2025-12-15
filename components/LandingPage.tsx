@@ -121,13 +121,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             <div className="flex items-center gap-4">
                <button 
-                  onClick={() => setShowOrderModal(true)}
-                  className="hidden md:flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-full font-medium hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg active:scale-95 transform"
-               >
-                  <Plus className="w-4 h-4" />
-                  Encomendar Agora
-               </button>
-               <button 
                   onClick={onEnterProduction}
                   className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 font-medium transition-colors px-3 py-2 rounded-lg hover:bg-slate-50"
                   title="Acesso da Equipe"
