@@ -98,8 +98,8 @@ export const CatalogManager: React.FC = () => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      // Salva apenas o nome do arquivo. Como o base="./", o navegador buscará na mesma pasta do index.html (raiz do dist)
-      const relativePath = file.name;
+      // Adiciona automaticamente o prefixo 'produtos/' ao selecionar o arquivo
+      const relativePath = `produtos/${file.name}`;
       setNewItem(prev => ({ ...prev, imageUrl: relativePath }));
     }
   };
@@ -394,7 +394,7 @@ export const CatalogManager: React.FC = () => {
                           value={newItem.imageUrl}
                           onChange={e => setNewItem({...newItem, imageUrl: e.target.value})}
                           className="flex-1 rounded-lg border-slate-300 border p-2 text-sm bg-white"
-                          placeholder="nome-do-arquivo.jpg"
+                          placeholder="produtos/nome-do-arquivo.jpg"
                       />
                       <input 
                           type="file" 
@@ -414,7 +414,7 @@ export const CatalogManager: React.FC = () => {
                       )}
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">
-                      * O arquivo deve existir fisicamente na pasta "public" do projeto.
+                      * O arquivo deve existir fisicamente na pasta "public/produtos" do projeto.
                   </p>
               </div>
               <div className="md:col-span-2">
