@@ -313,7 +313,14 @@ const App: React.FC = () => {
   };
 
   if (showLanding) {
-    return <LandingPage onEnterProduction={() => setShowLanding(false)} isOnline={isOnline} />;
+    return (
+      <LandingPage 
+        onEnterProduction={() => setShowLanding(false)} 
+        isOnline={isOnline} 
+        partsColors={partsColors}
+        availableTextures={availableTextures.map(t => t.name)}
+      />
+    );
   }
 
   if (!currentUser) {

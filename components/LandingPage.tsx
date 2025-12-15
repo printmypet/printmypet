@@ -1,15 +1,19 @@
 
 import React, { useEffect, useState } from 'react';
-import { Settings, ShoppingBag, Search, Menu, X, ArrowRight, Filter, ChevronDown } from 'lucide-react';
-import { CatalogProduct, Category, Banner } from '../types';
-import { fetchCatalogProducts, fetchCategories, fetchBanners } from '../services/supabase';
+import { Settings, ShoppingBag, Search, Menu, X, ArrowRight, Filter, ChevronDown, CheckCircle, Home } from 'lucide-react';
+import { CatalogProduct, Category, Banner, PartsColors, Order } from '../types';
+import { fetchCatalogProducts, fetchCategories, fetchBanners, addOrderToSupabase } from '../services/supabase';
+import { OrderForm } from './OrderForm';
+import { v4 as uuidv4 } from 'uuid';
 
 interface LandingPageProps {
   onEnterProduction: () => void;
   isOnline: boolean;
+  partsColors: PartsColors;
+  availableTextures: string[];
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isOnline }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isOnline, partsColors, availableTextures }) => {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -20,21 +24,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
 
+  // Flow State
+  const [view, setView] = useState<'store' | 'config' | 'success'>('store');
+  const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
+
   useEffect(() => {
-    // Carrega os dados sempre que montar, ou quando a conexão online for restabelecida
     loadData();
   }, [isOnline]);
 
   const loadData = async () => {
     setLoading(true);
-    // Se não estiver online, as funções retornarão array vazio, o que é seguro.
     const [prodData, catData, bannerData] = await Promise.all([
         fetchCatalogProducts(),
         fetchCategories(),
         fetchBanners()
     ]);
     
-    // Só atualiza se tiver dados ou se estivermos online (para garantir que limpe se falhar)
     if (prodData) setProducts(prodData);
     if (catData) setCategories(catData);
     if (bannerData) setBanners(bannerData);
@@ -72,12 +77,92 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
     return true;
   });
 
-  // Helper para resolver caminho da imagem (remove barra inicial se existir)
   const resolveImagePath = (path: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
     return path.startsWith('/') ? path.slice(1) : path;
   };
+
+  // --- Handlers for Order Flow ---
+  
+  const handleProductClick = (product: CatalogProduct) => {
+      setSelectedProduct(product);
+      setView('config');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOrderSubmit = async (orderData: Omit<Order, 'id' | 'createdAt' | 'status'>) => {
+     try {
+         const newOrder: Order = {
+             ...orderData,
+             id: uuidv4(),
+             createdAt: new Date().toISOString(),
+             status: 'Pendente'
+         };
+         await addOrderToSupabase(newOrder);
+         setView('success');
+         window.scrollTo({ top: 0, behavior: 'smooth' });
+     } catch (e) {
+         alert("Erro ao realizar pedido. Tente novamente.");
+     }
+  };
+
+  const handleBackToStore = () => {
+      setView('store');
+      setSelectedProduct(null);
+  };
+
+
+  if (view === 'success') {
+      return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+              <div className="bg-white max-w-lg w-full rounded-2xl shadow-xl p-8 text-center animate-fade-in-up border border-slate-100">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <CheckCircle className="w-10 h-10 text-green-600" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-slate-900 mb-2">Pedido Realizado!</h2>
+                  <p className="text-slate-600 mb-8 leading-relaxed">
+                      Recebemos sua solicitação com sucesso. <br/>
+                      Nossa equipe entrará em contato em breve via WhatsApp ou Email para confirmar os detalhes e combinar o pagamento.
+                  </p>
+                  <button 
+                      onClick={handleBackToStore}
+                      className="bg-indigo-600 text-white font-bold py-3 px-8 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 w-full sm:w-auto mx-auto"
+                  >
+                      <Home className="w-5 h-5" />
+                      Voltar para a Loja
+                  </button>
+              </div>
+          </div>
+      );
+  }
+
+  if (view === 'config') {
+      return (
+          <div className="min-h-screen bg-slate-50">
+              <header className="bg-white shadow-sm border-b border-slate-200 py-4 sticky top-0 z-50">
+                  <div className="max-w-7xl mx-auto px-4 flex items-center gap-4">
+                      <button onClick={handleBackToStore} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                          <ArrowRight className="w-6 h-6 rotate-180 text-slate-600" />
+                      </button>
+                      <div>
+                          <h1 className="text-lg font-bold text-slate-900">Configurar Pedido</h1>
+                          {selectedProduct && <p className="text-xs text-slate-500">Item selecionado: {selectedProduct.name}</p>}
+                      </div>
+                  </div>
+              </header>
+              <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 animate-fade-in">
+                  <OrderForm 
+                      partsColors={partsColors}
+                      availableTextures={availableTextures}
+                      onSave={handleOrderSubmit}
+                      onCancel={handleBackToStore}
+                      isPublic={true}
+                  />
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -86,7 +171,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
       <header className="sticky top-0 z-50 bg-slate-900 text-white shadow-lg border-b border-slate-800 h-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
             {/* Logo */}
-            <div className="flex items-center select-none font-logo">
+            <div className="flex items-center select-none font-logo cursor-pointer" onClick={() => setView('store')}>
                 <span className="text-2xl font-bold tracking-tight">PrintMy</span>
                 <span className="text-2xl font-bold tracking-tight text-sky-400">[]</span>
                 <span className="text-2xl font-bold tracking-tight">3D</span>
@@ -289,7 +374,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
         ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {filteredProducts.map(product => (
-                    <div key={product.id} className="group bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col">
+                    <div 
+                      key={product.id} 
+                      onClick={() => handleProductClick(product)}
+                      className="group bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col cursor-pointer"
+                    >
                         <div className="relative h-48 bg-slate-100 overflow-hidden">
                             {product.imageUrl ? (
                                 <img src={resolveImagePath(product.imageUrl)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -306,7 +395,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
                             {/* Quick Action Overlay */}
                             <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-gradient-to-t from-slate-900/80 to-transparent flex justify-center pt-8">
                                 <button className="bg-white text-slate-900 text-xs font-bold px-4 py-2 rounded-full shadow hover:bg-sky-50 w-full">
-                                    Ver Detalhes
+                                    Personalizar e Comprar
                                 </button>
                             </div>
                         </div>
@@ -328,7 +417,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
                                     <span className="text-[10px] text-slate-400 line-through">R$ {(product.price * 1.2).toFixed(2)}</span>
                                     <span className="text-lg font-bold text-slate-800">R$ {product.price.toFixed(2)}</span>
                                 </div>
-                                <button className="w-8 h-8 rounded-full bg-slate-100 hover:bg-indigo-600 hover:text-white flex items-center justify-center transition-colors text-slate-600">
+                                <button className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-colors text-slate-600">
                                     <ShoppingBag className="w-4 h-4" />
                                 </button>
                             </div>

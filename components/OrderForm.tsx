@@ -18,6 +18,7 @@ interface OrderFormProps {
   onSave: (order: Omit<Order, 'id' | 'createdAt' | 'status'>) => void;
   onCancel: () => void;
   initialOrder?: Order | null;
+  isPublic?: boolean; // New prop to control visibility
 }
 
 export const OrderForm: React.FC<OrderFormProps> = ({ 
@@ -25,7 +26,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   availableTextures, 
   onSave, 
   onCancel,
-  initialOrder
+  initialOrder,
+  isPublic = false
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
   
@@ -255,12 +257,15 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     onSave({ 
       customer: {
         ...customer,
+        // Force 'final' type if public
+        type: isPublic ? 'final' : customer.type,
         address: fullAddress || 'Endereço não informado'
       },
       products: cartItems, 
-      price: totalRaw / 100, 
-      shippingCost: shippingPriceRaw / 100, 
-      isPaid
+      // If public, we might submit 0 or handled by backend, here we submit 0 if hidden
+      price: isPublic ? 0 : totalRaw / 100, 
+      shippingCost: isPublic ? 0 : shippingPriceRaw / 100, 
+      isPaid: isPublic ? false : isPaid
     });
   };
 
@@ -443,7 +448,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       <div className="border-b border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
           {step === 1 ? <Box className="w-5 h-5 text-indigo-600"/> : <User className="w-5 h-5 text-indigo-600"/>}
-          {step === 1 ? 'Configuração do Produto' : 'Dados do Cliente e Pagamento'}
+          {step === 1 ? 'Configuração do Produto' : isPublic ? 'Seus Dados' : 'Dados do Cliente e Pagamento'}
         </h2>
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <button 
@@ -693,54 +698,64 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
         {step === 2 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2 flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
-               <DollarSign className="w-5 h-5 text-green-600" />
-               <h3 className="text-lg font-medium text-slate-900">Financeiro ({cartItems.length} itens no pedido)</h3>
-            </div>
+            
+            {/* Se for público, não mostra a seção financeira */}
+            {!isPublic ? (
+            <>
+              <div className="md:col-span-2 flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
+                 <DollarSign className="w-5 h-5 text-green-600" />
+                 <h3 className="text-lg font-medium text-slate-900">Financeiro ({cartItems.length} itens no pedido)</h3>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:col-span-2 mb-2">
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor dos Produtos</label>
-                    <input 
-                        type="text"
-                        inputMode="numeric"
-                        value={productsPriceDisplay}
-                        onChange={handleProductsPriceChange}
-                        className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium"
-                        placeholder="R$ 0,00"
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor do Frete</label>
-                    <input 
-                        type="text"
-                        inputMode="numeric"
-                        value={shippingPriceDisplay}
-                        onChange={handleShippingPriceChange}
-                        className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium"
-                        placeholder="R$ 0,00"
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total (Automático)</label>
-                    <div className="w-full rounded-lg border border-slate-200 bg-slate-100 p-2 font-bold text-lg text-slate-900 flex items-center justify-between">
-                         <span>{totalDisplay}</span>
-                         {totalRaw > 0 && <span className="text-xs font-normal text-slate-500">Calculado</span>}
-                    </div>
-                </div>
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:col-span-2 mb-2">
+                  <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Valor dos Produtos</label>
+                      <input 
+                          type="text"
+                          inputMode="numeric"
+                          value={productsPriceDisplay}
+                          onChange={handleProductsPriceChange}
+                          className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium"
+                          placeholder="R$ 0,00"
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Valor do Frete</label>
+                      <input 
+                          type="text"
+                          inputMode="numeric"
+                          value={shippingPriceDisplay}
+                          onChange={handleShippingPriceChange}
+                          className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium"
+                          placeholder="R$ 0,00"
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total (Automático)</label>
+                      <div className="w-full rounded-lg border border-slate-200 bg-slate-100 p-2 font-bold text-lg text-slate-900 flex items-center justify-between">
+                           <span>{totalDisplay}</span>
+                           {totalRaw > 0 && <span className="text-xs font-normal text-slate-500">Calculado</span>}
+                      </div>
+                  </div>
+              </div>
 
-            <div className="md:col-span-2 flex items-end pb-4 border-b border-slate-100 mb-2">
-              <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg w-full bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors h-[46px]">
-                <input 
-                  type="checkbox"
-                  checked={isPaid}
-                  onChange={(e) => setIsPaid(e.target.checked)}
-                  className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
-                />
-                <span className="font-medium text-slate-900">Pedido já foi Pago?</span>
-              </label>
-            </div>
+              <div className="md:col-span-2 flex items-end pb-4 border-b border-slate-100 mb-2">
+                <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg w-full bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors h-[46px]">
+                  <input 
+                    type="checkbox"
+                    checked={isPaid}
+                    onChange={(e) => setIsPaid(e.target.checked)}
+                    className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
+                  />
+                  <span className="font-medium text-slate-900">Pedido já foi Pago?</span>
+                </label>
+              </div>
+            </>
+            ) : (
+                <div className="md:col-span-2 bg-indigo-50 border border-indigo-100 p-4 rounded-lg text-sm text-indigo-800 mb-4">
+                    <strong>Resumo:</strong> Você está solicitando {cartItems.length} item(ns). Os valores e detalhes do pagamento serão confirmados em breve pela nossa equipe.
+                </div>
+            )}
 
             <div className="md:col-span-2 mt-2 flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
                <User className="w-5 h-5 text-indigo-600" />
@@ -784,6 +799,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               />
             </div>
             
+            {!isPublic && (
             <div className="md:col-span-2 mb-2 mt-2">
               <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Cliente</label>
               <div className="flex gap-4">
@@ -817,8 +833,9 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 </label>
               </div>
             </div>
+            )}
 
-            {customer.type === 'partner' && (
+            {!isPublic && customer.type === 'partner' && (
               <div className="md:col-span-2 animate-fade-in bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-2">
                 <label className="block text-sm font-medium text-indigo-900 mb-1">Nome da Loja / Parceiro</label>
                 <input 
@@ -989,7 +1006,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             className={cartItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
           >
             <Save className="w-4 h-4 mr-2" />
-            {initialOrder ? 'Atualizar Pedido' : cartItems.length === 0 ? 'Adicione itens para Salvar' : `Salvar Pedido (${cartItems.length} itens)`}
+            {initialOrder ? 'Atualizar Pedido' : cartItems.length === 0 ? 'Adicione itens para Salvar' : isPublic ? 'Finalizar Pedido' : `Salvar Pedido (${cartItems.length} itens)`}
           </Button>
         )}
       </div>
