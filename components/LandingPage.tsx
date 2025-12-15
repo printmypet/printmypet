@@ -135,7 +135,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* --- CATEGORY NAV --- */}
       <div className="sticky top-16 z-40 bg-indigo-900 text-white shadow-md border-t border-indigo-800">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-1 overflow-x-auto h-12 scrollbar-hide">
+            <div className="flex items-center gap-1 h-12 overflow-x-auto md:overflow-visible scrollbar-hide">
                 {/* 'Todos' Button */}
                 <button
                     onClick={() => { setSelectedCategory('Todos'); setSelectedSubcategory(null); }}
@@ -154,42 +154,45 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                 {/* Categories */}
                 {categories.map(cat => (
-                    <div key={cat.id} className="relative group h-full">
+                    <div key={cat.id} className="relative group h-full flex items-center">
                         <button
                             onClick={() => { setSelectedCategory(cat.name); setSelectedSubcategory(null); }}
                             className={`px-4 h-full flex items-center gap-1 text-sm font-medium transition-all whitespace-nowrap border-b-2 ${
                                 selectedCategory === cat.name
                                 ? 'border-sky-400 text-white bg-white/10' 
-                                : 'border-transparent text-indigo-100 hover:text-white hover:bg-white/5'
+                                : 'border-transparent text-indigo-100 group-hover:text-white group-hover:bg-white/5'
                             }`}
                         >
                             {cat.name}
                             {cat.subcategories && cat.subcategories.length > 0 && (
-                                <ChevronDown className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity mt-0.5" />
+                                <ChevronDown className="w-3 h-3 opacity-70 transition-transform duration-300 group-hover:rotate-180 ml-1" />
                             )}
                         </button>
                         
-                        {/* Subcategory Dropdown */}
+                        {/* Subcategory Dropdown - Estilo 'Voolt3D' (Fundo branco, lista limpa) */}
                         {cat.subcategories && cat.subcategories.length > 0 && (
-                            <div className="hidden group-hover:block absolute left-0 top-full bg-white shadow-xl rounded-b-md py-2 min-w-[200px] z-50 animate-fade-in border-t-2 border-indigo-600">
-                                <div className="flex flex-col">
-                                    {cat.subcategories.map(sub => (
-                                        <button
-                                            key={sub.id}
-                                            onClick={(e) => {
-                                                e.stopPropagation(); 
-                                                setSelectedCategory(cat.name);
-                                                setSelectedSubcategory(sub.name);
-                                            }}
-                                            className={`text-left px-4 py-2.5 text-sm transition-colors hover:bg-slate-50 ${
-                                                selectedCategory === cat.name && selectedSubcategory === sub.name
-                                                ? 'text-indigo-600 font-bold bg-indigo-50'
-                                                : 'text-slate-600 hover:text-indigo-600'
-                                            }`}
-                                        >
-                                            {sub.name}
-                                        </button>
-                                    ))}
+                            <div className="hidden group-hover:block absolute left-0 top-full pt-0 w-56 z-50 animate-fade-in">
+                                <div className="bg-white shadow-xl rounded-b-md py-2 border border-slate-100">
+                                    <ul className="flex flex-col text-left">
+                                        {cat.subcategories.map(sub => (
+                                            <li key={sub.id}>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation(); 
+                                                        setSelectedCategory(cat.name);
+                                                        setSelectedSubcategory(sub.name);
+                                                    }}
+                                                    className={`w-full text-left px-5 py-2.5 text-sm transition-colors border-l-4 ${
+                                                        selectedCategory === cat.name && selectedSubcategory === sub.name
+                                                        ? 'border-indigo-600 text-indigo-600 font-bold bg-indigo-50'
+                                                        : 'border-transparent text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {sub.name}
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </div>
                             </div>
                         )}
