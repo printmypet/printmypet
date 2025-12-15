@@ -313,7 +313,7 @@ const App: React.FC = () => {
   };
 
   if (showLanding) {
-    return <LandingPage onEnterProduction={() => setShowLanding(false)} />;
+    return <LandingPage onEnterProduction={() => setShowLanding(false)} isOnline={isOnline} />;
   }
 
   if (!currentUser) {

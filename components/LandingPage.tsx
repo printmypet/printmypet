@@ -6,9 +6,10 @@ import { fetchCatalogProducts, fetchCategories, fetchBanners } from '../services
 
 interface LandingPageProps {
   onEnterProduction: () => void;
+  isOnline: boolean;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isOnline }) => {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -19,19 +20,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction }) =
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
 
   useEffect(() => {
+    // Carrega os dados sempre que montar, ou quando a conexão online for restabelecida
     loadData();
-  }, []);
+  }, [isOnline]);
 
   const loadData = async () => {
     setLoading(true);
+    // Se não estiver online, as funções retornarão array vazio, o que é seguro.
     const [prodData, catData, bannerData] = await Promise.all([
         fetchCatalogProducts(),
         fetchCategories(),
         fetchBanners()
     ]);
-    setProducts(prodData);
-    setCategories(catData);
-    setBanners(bannerData);
+    
+    // Só atualiza se tiver dados ou se estivermos online (para garantir que limpe se falhar)
+    if (prodData) setProducts(prodData);
+    if (catData) setCategories(catData);
+    if (bannerData) setBanners(bannerData);
+    
     setLoading(false);
   };
 
