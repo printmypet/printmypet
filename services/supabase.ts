@@ -442,8 +442,17 @@ export const fetchBanners = async (): Promise<Banner[]> => {
 
 export const addBanner = async (banner: { imageUrl: string }) => {
   if (!supabase) return;
-  const { error } = await supabase.from('banners').insert([{ image_url: banner.imageUrl }]);
-  if (error) throw error;
+  // Include legacy fields to satisfy potential NOT NULL constraints on older DB schemas
+  const { error } = await supabase.from('banners').insert([{ 
+    image_url: banner.imageUrl,
+    title: 'Banner Image', 
+    subtitle: '',
+    theme: 'dark'
+  }]);
+  if (error) {
+    console.error("Error adding banner:", error.message);
+    throw error;
+  }
 };
 
 export const deleteBanner = async (id: string) => {

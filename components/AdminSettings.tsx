@@ -463,7 +463,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const getSqlScript = () => {
     return [
-      "-- SCRIPT COMPLETO (v21 - BANNERS COM IMAGEM)",
+      "-- SCRIPT COMPLETO (v22 - BANNERS COM IMAGEM e CORREÇÕES)",
       
       "-- 1. Tabelas de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
@@ -513,6 +513,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "CREATE TABLE IF NOT EXISTS public.subcategories (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, category_id uuid REFERENCES public.categories(id) ON DELETE CASCADE);",
       "CREATE TABLE IF NOT EXISTS public.banners (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), title text, subtitle text, theme text DEFAULT 'blue');",
       "ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS image_url text;",
+      "ALTER TABLE public.banners ALTER COLUMN title DROP NOT NULL;",
 
       "-- 9. Segurança RLS (Limpeza e Recriação)",
       
@@ -563,7 +564,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     navigator.clipboard.writeText(getSqlScript());
-    alert("SQL Completo (v21) copiado! Cole no SQL Editor do Supabase.");
+    alert("SQL Completo (v22) copiado! Cole no SQL Editor do Supabase.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = { base: 'Base', ball: 'Bola', top: 'Tampa/Topo' };
