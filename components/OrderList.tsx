@@ -1,8 +1,7 @@
-
 // @ts-nocheck
 import React, { useState } from 'react';
 import { Search, Trash2, Edit2, Package, MapPin, Phone, Mail, FileText, DollarSign, CheckSquare, Square, Instagram, Users, Clock, CheckCircle, ListFilter, Filter, Truck, AlertCircle, Check, Bell } from 'lucide-react';
-import { Order, OrderStatus, ProductConfig } from '../types';
+import { Order, OrderStatus, ProductConfig, PartsColors } from '../types';
 import { Button } from './ui/Button';
 
 interface OrderListProps {
@@ -14,6 +13,7 @@ interface OrderListProps {
   onEdit: (order: Order) => void;
   newOrderAlert?: boolean;
   onClearAlert?: () => void;
+  partsColors?: PartsColors;
 }
 
 const statusColors: Record<OrderStatus, string> = {
@@ -34,7 +34,8 @@ export const OrderList: React.FC<OrderListProps> = ({
   onDelete, 
   onEdit,
   newOrderAlert,
-  onClearAlert
+  onClearAlert,
+  partsColors
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('open');
@@ -82,6 +83,12 @@ export const OrderList: React.FC<OrderListProps> = ({
      };
 
      onUpdateProducts(order.id, newProducts);
+  };
+
+  const getColorName = (hex: string, type: keyof PartsColors) => {
+    if (!partsColors) return hex;
+    const found = partsColors[type]?.find(c => c.hex.toLowerCase() === hex.toLowerCase());
+    return found ? found.name : hex;
   };
 
   // Helper para decidir cor do ícone (Preto ou Branco) baseado no fundo
@@ -300,7 +307,7 @@ export const OrderList: React.FC<OrderListProps> = ({
                                                     onClick={() => handleTogglePartStatus(order, idx, 'part1')}
                                                     className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
                                                     style={{backgroundColor: product.part1Color}} 
-                                                    title="Base (Clique para confirmar)"
+                                                    title={`Base: ${getColorName(product.part1Color, 'base')} (Clique para alterar status)`}
                                                 >
                                                     {pStatus.part1 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part1Color)}`} />}
                                                 </div>
@@ -313,7 +320,7 @@ export const OrderList: React.FC<OrderListProps> = ({
                                                     onClick={() => handleTogglePartStatus(order, idx, 'part2')}
                                                     className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
                                                     style={{backgroundColor: product.part2Color}} 
-                                                    title="Bola (Clique para confirmar)"
+                                                    title={`Bola: ${getColorName(product.part2Color, 'ball')} (Clique para alterar status)`}
                                                 >
                                                     {pStatus.part2 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part2Color)}`} />}
                                                 </div>
@@ -326,7 +333,7 @@ export const OrderList: React.FC<OrderListProps> = ({
                                                     onClick={() => handleTogglePartStatus(order, idx, 'part3')}
                                                     className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
                                                     style={{backgroundColor: product.part3Color}} 
-                                                    title="Topo (Clique para confirmar)"
+                                                    title={`Topo: ${getColorName(product.part3Color, 'top')} (Clique para alterar status)`}
                                                 >
                                                     {pStatus.part3 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part3Color)}`} />}
                                                 </div>
