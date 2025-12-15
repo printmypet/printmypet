@@ -487,7 +487,7 @@ export const CatalogManager: React.FC = () => {
                                             value={newSubcategoryName}
                                             onChange={e => setNewSubcategoryName(e.target.value)}
                                             placeholder="Nome da sub..."
-                                            className="w-full text-xs p-1 rounded border border-slate-300"
+                                            className="w-full text-xs p-1 rounded border border-slate-300 bg-white"
                                             autoFocus
                                         />
                                         <button type="submit" className="text-green-600 bg-green-50 p-1 rounded border border-green-200">
