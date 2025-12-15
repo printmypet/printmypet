@@ -260,41 +260,50 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, onUpdateStatus, on
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-slate-500 text-xs">Produção:</span>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-4">
                                             {/* Part 1 */}
-                                            <div 
-                                                onClick={() => handleTogglePartStatus(order, idx, 'part1')}
-                                                className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
-                                                style={{backgroundColor: product.part1Color}} 
-                                                title="Base (Clique para confirmar)"
-                                            >
-                                                {pStatus.part1 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part1Color)}`} />}
+                                            <div className="flex flex-col items-center gap-1">
+                                                <div 
+                                                    onClick={() => handleTogglePartStatus(order, idx, 'part1')}
+                                                    className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
+                                                    style={{backgroundColor: product.part1Color}} 
+                                                    title="Base (Clique para confirmar)"
+                                                >
+                                                    {pStatus.part1 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part1Color)}`} />}
+                                                </div>
+                                                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Base</span>
                                             </div>
 
                                             {/* Part 2 */}
-                                            <div 
-                                                onClick={() => handleTogglePartStatus(order, idx, 'part2')}
-                                                className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
-                                                style={{backgroundColor: product.part2Color}} 
-                                                title="Bola (Clique para confirmar)"
-                                            >
-                                                {pStatus.part2 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part2Color)}`} />}
+                                            <div className="flex flex-col items-center gap-1">
+                                                <div 
+                                                    onClick={() => handleTogglePartStatus(order, idx, 'part2')}
+                                                    className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
+                                                    style={{backgroundColor: product.part2Color}} 
+                                                    title="Bola (Clique para confirmar)"
+                                                >
+                                                    {pStatus.part2 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part2Color)}`} />}
+                                                </div>
+                                                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Bola</span>
                                             </div>
 
                                             {/* Part 3 */}
-                                            <div 
-                                                onClick={() => handleTogglePartStatus(order, idx, 'part3')}
-                                                className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
-                                                style={{backgroundColor: product.part3Color}} 
-                                                title="Topo (Clique para confirmar)"
-                                            >
-                                                {pStatus.part3 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part3Color)}`} />}
+                                            <div className="flex flex-col items-center gap-1">
+                                                <div 
+                                                    onClick={() => handleTogglePartStatus(order, idx, 'part3')}
+                                                    className={`relative rounded-full border border-slate-300 flex items-center justify-center transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 w-6 h-6`} 
+                                                    style={{backgroundColor: product.part3Color}} 
+                                                    title="Topo (Clique para confirmar)"
+                                                >
+                                                    {pStatus.part3 && <Check className={`w-4 h-4 drop-shadow-sm stroke-[3] ${getCheckColorClass(product.part3Color)}`} />}
+                                                </div>
+                                                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Topo</span>
                                             </div>
                                         </div>
                                     </div>
                                     
                                     <div className="text-[10px] text-slate-400 text-right">
-                                        * Clique nas cores para marcar as peças prontas
+                                        * Clique para marcar pronto
                                     </div>
 
                                     <div className="flex items-center justify-between">
