@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Settings, ShoppingBag, Search, Menu, X, ArrowRight, Filter } from 'lucide-react';
+import { Settings, ShoppingBag, Search, Menu, X, ArrowRight, Filter, ChevronDown } from 'lucide-react';
 import { CatalogProduct, Category, Banner } from '../types';
 import { fetchCatalogProducts, fetchCategories, fetchBanners } from '../services/supabase';
 
@@ -72,8 +72,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       
       {/* --- HEADER / TOPBAR --- */}
-      <header className="sticky top-0 z-50 bg-slate-900 text-white shadow-lg border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-slate-900 text-white shadow-lg border-b border-slate-800 h-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center select-none font-logo">
                 <span className="text-2xl font-bold tracking-tight">PrintMy</span>
@@ -114,7 +114,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
 
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
-             <div className="md:hidden bg-slate-800 border-t border-slate-700 p-4 space-y-4 animate-fade-in">
+             <div className="md:hidden bg-slate-800 border-t border-slate-700 p-4 space-y-4 animate-fade-in absolute w-full left-0 top-16 shadow-xl">
                  <div className="relative">
                     <input 
                         type="text" 
@@ -133,6 +133,44 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
         )}
       </header>
 
+      {/* --- CATEGORY NAV (Moved Above Banner) --- */}
+      <section className="sticky top-16 z-40 bg-indigo-900 text-white shadow-md border-t border-indigo-800">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-1 overflow-x-auto h-12 no-scrollbar">
+                {/* 'Todos' Button */}
+                <button
+                    onClick={() => setSelectedCategory('Todos')}
+                    className={`px-4 h-full flex items-center gap-2 text-sm font-medium transition-all whitespace-nowrap border-b-2 ${
+                        selectedCategory === 'Todos' 
+                        ? 'border-sky-400 text-white bg-white/10' 
+                        : 'border-transparent text-indigo-100 hover:text-white hover:bg-white/5'
+                    }`}
+                >
+                   <Filter className="w-4 h-4" />
+                   Todos
+                </button>
+                
+                {/* Separator */}
+                <div className="w-px h-4 bg-indigo-800 mx-2 hidden sm:block"></div>
+
+                {/* Categories */}
+                {categories.map(cat => (
+                    <button
+                        key={cat.id}
+                        onClick={() => setSelectedCategory(cat.name)}
+                        className={`group px-4 h-full flex items-center gap-1 text-sm font-medium transition-all whitespace-nowrap border-b-2 ${
+                            selectedCategory === cat.name
+                            ? 'border-sky-400 text-white bg-white/10' 
+                            : 'border-transparent text-indigo-100 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        {cat.name}
+                        <ChevronDown className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity mt-0.5" />
+                    </button>
+                ))}
+            </div>
+         </div>
+      </section>
 
       {/* --- HERO BANNER --- */}
       <section className="relative h-[300px] md:h-[400px] bg-slate-900 overflow-hidden">
@@ -164,38 +202,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
                     className={`w-3 h-3 rounded-full transition-all ${currentBanner === idx ? 'bg-white w-6' : 'bg-white/30'}`}
                  ></button>
              ))}
-         </div>
-      </section>
-
-      {/* --- CATEGORY NAV --- */}
-      <section className="sticky top-16 z-40 bg-slate-50/90 backdrop-blur-sm border-b border-slate-200 py-4">
-         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide no-scrollbar">
-                <button
-                    onClick={() => setSelectedCategory('Todos')}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
-                        selectedCategory === 'Todos' 
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
-                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                    }`}
-                >
-                   {selectedCategory === 'Todos' && <Filter className="w-3 h-3" />}
-                   Todos
-                </button>
-                {categories.map(cat => (
-                    <button
-                        key={cat.id}
-                        onClick={() => setSelectedCategory(cat.name)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
-                            selectedCategory === cat.name
-                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                        }`}
-                    >
-                        {cat.name}
-                    </button>
-                ))}
-            </div>
          </div>
       </section>
 
