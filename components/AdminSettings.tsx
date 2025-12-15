@@ -42,7 +42,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
   const [newTextureName, setNewTextureName] = useState('');
   const [isProcessingColor, setIsProcessingColor] = useState(false);
   const [isProcessingTexture, setIsProcessingTexture] = useState(false);
-  const [showSqlPreview, setShowSqlPreview] = useState(false);
   
   // Drag and Drop State
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
@@ -464,7 +463,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const getSqlScript = () => {
     return [
-      "-- SCRIPT COMPLETO (v18 - ADIÇÃO TABELAS CATEGORIAS E BANNERS)",
+      "-- SCRIPT COMPLETO (v19 - SUBCATEGORIAS)",
       
       "-- 1. Tabelas de Clientes",
       "CREATE TABLE IF NOT EXISTS public.customers (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL);",
@@ -505,9 +504,11 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
       "-- 7. Tabela de Catálogo de Produtos (Vitrine)",
       "CREATE TABLE IF NOT EXISTS public.catalog_products (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, description text, price numeric NOT NULL, image_url text, category text DEFAULT 'Geral', highlight boolean DEFAULT false);",
+      "ALTER TABLE public.catalog_products ADD COLUMN IF NOT EXISTS subcategory text;",
 
-      "-- 8. Tabelas de Categorias e Banners",
+      "-- 8. Tabelas de Categorias, Subcategorias e Banners",
       "CREATE TABLE IF NOT EXISTS public.categories (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL UNIQUE);",
+      "CREATE TABLE IF NOT EXISTS public.subcategories (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, category_id uuid REFERENCES public.categories(id) ON DELETE CASCADE);",
       "CREATE TABLE IF NOT EXISTS public.banners (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, created_at timestamptz DEFAULT now(), title text NOT NULL, subtitle text, theme text DEFAULT 'blue');",
 
       "-- 9. Segurança RLS (Limpeza e Recriação)",
@@ -544,6 +545,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       "DROP POLICY IF EXISTS \"Public Access Categories\" ON public.categories;",
       "CREATE POLICY \"Public Access Categories\" ON public.categories FOR ALL USING (true) WITH CHECK (true);",
 
+      "ALTER TABLE public.subcategories ENABLE ROW LEVEL SECURITY;",
+      "DROP POLICY IF EXISTS \"Public Access Subcategories\" ON public.subcategories;",
+      "CREATE POLICY \"Public Access Subcategories\" ON public.subcategories FOR ALL USING (true) WITH CHECK (true);",
+
       "ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;",
       "DROP POLICY IF EXISTS \"Public Access Banners\" ON public.banners;",
       "CREATE POLICY \"Public Access Banners\" ON public.banners FOR ALL USING (true) WITH CHECK (true);",
@@ -555,7 +560,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
   const copySql = () => {
     navigator.clipboard.writeText(getSqlScript());
-    alert("SQL Completo (v18) copiado! Cole no SQL Editor do Supabase.");
+    alert("SQL Completo (v19) copiado! Cole no SQL Editor do Supabase.");
   };
 
   const partLabels: Record<keyof PartsColors, string> = { base: 'Base', ball: 'Bola', top: 'Tampa/Topo' };
@@ -650,6 +655,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       {/* --- FILAMENTS TAB --- */}
       {isAdmin && activeTab === 'filaments' && (
          <div className="space-y-6">
+             {/* ... (Existing Filament UI) ... */}
              <div className="flex items-center gap-3 mb-6">
                  <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
                     <Disc className="w-6 h-6" />
@@ -809,336 +815,320 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
       {/* --- REPORTS TAB --- */}
       {isAdmin && activeTab === 'reports' && (
         <div className="space-y-6">
-             <div className="flex items-center gap-3 mb-6">
-                 <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
-                    <TrendingUp className="w-6 h-6" />
-                 </div>
-                 <div>
-                    <h3 className="text-lg font-bold text-slate-900">Relatórios Financeiros</h3>
-                    <p className="text-sm text-slate-500">Acompanhe o desempenho das suas vendas.</p>
-                 </div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Recebido</h4>
+                 <div className="text-2xl font-bold text-emerald-600">{formatCurrency(financialData.totalPaid)}</div>
+                 <div className="text-xs text-slate-400 mt-1">{financialData.paidOrdersCount} pedidos pagos</div>
+             </div>
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">A Receber (Pendente)</h4>
+                 <div className="text-2xl font-bold text-amber-500">{formatCurrency(financialData.totalPending)}</div>
+                 <div className="text-xs text-slate-400 mt-1">{financialData.totalOrders - financialData.paidOrdersCount} pedidos pendentes</div>
+             </div>
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Custo de Frete (Pago)</h4>
+                 <div className="text-2xl font-bold text-slate-700">{formatCurrency(financialData.paidShipping)}</div>
+             </div>
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lucro Produto (Pago)</h4>
+                 <div className="text-2xl font-bold text-indigo-600">{formatCurrency(financialData.paidProducts)}</div>
+                 <div className="text-xs text-slate-400 mt-1">Excluindo frete</div>
+             </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2 text-slate-500 text-xs uppercase font-bold">
-                     <Package className="w-4 h-4" /> Total Pedidos
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900">{financialData.totalOrders}</div>
-               </div>
-               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2 text-green-600 text-xs uppercase font-bold">
-                     <DollarSign className="w-4 h-4" /> Receita Confirmada
-                  </div>
-                  <div className="text-2xl font-bold text-green-600">{formatCurrency(financialData.totalPaid)}</div>
-                  <div className="text-xs text-slate-400 mt-1">{financialData.paidOrdersCount} pedidos pagos</div>
-               </div>
-               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2 text-amber-600 text-xs uppercase font-bold">
-                     <Clock className="w-4 h-4" /> Pendente Recebimento
-                  </div>
-                  <div className="text-2xl font-bold text-amber-600">{formatCurrency(financialData.totalPending)}</div>
-               </div>
-               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2 text-blue-600 text-xs uppercase font-bold">
-                     <Truck className="w-4 h-4" /> Gasto com Fretes
-                  </div>
-                  <div className="text-2xl font-bold text-blue-600">{formatCurrency(financialData.paidShipping + financialData.pendingShipping)}</div>
-               </div>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm min-h-[300px]">
+                 <h4 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                     <TrendingUp className="w-5 h-5 text-indigo-500" /> Fluxo de Caixa (Status)
+                 </h4>
+                 <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={chartDataStatus}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" fontSize={12} axisLine={false} tickLine={false} />
+                        <YAxis fontSize={12} axisLine={false} tickLine={false} tickFormatter={(val) => `R$${val}`} />
+                        <Tooltip 
+                            formatter={(value: number) => formatCurrency(value)}
+                            cursor={{ fill: 'transparent' }}
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                        />
+                        <Bar dataKey="valor" radius={[4, 4, 0, 0]}>
+                            {chartDataStatus.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={index === 0 ? '#10B981' : '#F59E0B'} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                 </ResponsiveContainer>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-80">
-                   <h4 className="font-semibold text-slate-800 mb-4 text-sm uppercase">Comparativo: Pago vs Pendente</h4>
-                   <ResponsiveContainer width="100%" height="100%">
-                     <BarChart data={chartDataStatus} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
-                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                       <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                       <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `R$${val}`} />
-                       <Tooltip cursor={{fill: 'transparent'}} formatter={(value: number) => formatCurrency(value)} />
-                       <Bar dataKey="valor" radius={[4, 4, 0, 0]}>
-                         {chartDataStatus.map((entry, index) => (
-                           <Cell key={`cell-${index}`} fill={index === 0 ? '#10B981' : '#F59E0B'} />
-                         ))}
-                       </Bar>
-                     </BarChart>
-                   </ResponsiveContainer>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-80">
-                   <h4 className="font-semibold text-slate-800 mb-4 text-sm uppercase">Composição da Receita</h4>
-                   <ResponsiveContainer width="100%" height="100%">
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm min-h-[300px]">
+                 <h4 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                     <DollarSign className="w-5 h-5 text-indigo-500" /> Composição Financeira
+                 </h4>
+                 <ResponsiveContainer width="100%" height={250}>
                      <PieChart>
-                        <Pie
-                          data={chartDataComposition}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {chartDataComposition.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS_PIE[index % COLORS_PIE.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                        <Legend />
+                         <Pie
+                             data={chartDataComposition}
+                             cx="50%"
+                             cy="50%"
+                             innerRadius={60}
+                             outerRadius={80}
+                             paddingAngle={5}
+                             dataKey="value"
+                         >
+                             {chartDataComposition.map((entry, index) => (
+                                 <Cell key={`cell-${index}`} fill={COLORS_PIE[index % COLORS_PIE.length]} />
+                             ))}
+                         </Pie>
+                         <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                         <Legend verticalAlign="bottom" height={36} iconType="circle" />
                      </PieChart>
-                   </ResponsiveContainer>
-                </div>
-            </div>
+                 </ResponsiveContainer>
+              </div>
+          </div>
         </div>
       )}
 
       {/* --- USERS TAB --- */}
       {isAdmin && activeTab === 'users' && (
-         <div className="space-y-6">
-             <div className="flex items-center gap-3 mb-6">
-                 <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
-                    <Users className="w-6 h-6" />
-                 </div>
-                 <div>
-                    <h3 className="text-lg font-bold text-slate-900">Gerenciamento de Usuários</h3>
-                    <p className="text-sm text-slate-500">Adicione ou remova acesso ao sistema administrativo.</p>
-                 </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* User Form */}
+            <div className="lg:col-span-1">
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-24">
+                    <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        {editingUserId ? <Edit2 className="w-4 h-4 text-orange-500"/> : <UserPlus className="w-4 h-4 text-green-500"/>} 
+                        {editingUserId ? 'Editar Usuário' : 'Novo Usuário'}
+                    </h4>
+                    
+                    {userMsg && (
+                        <div className={`mb-4 p-3 rounded-lg text-sm border ${userMsg.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                            {userMsg.text}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleRegisterOrUpdateUser} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
+                            <input 
+                                type="text"
+                                value={newUserName}
+                                onChange={e => setNewUserName(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+                                placeholder="Nome do usuário"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Login (Username)</label>
+                            <input 
+                                type="text"
+                                value={newUserLogin}
+                                onChange={e => setNewUserLogin(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+                                placeholder="Login para acesso"
+                                disabled={!!editingUserId} // Não permite mudar username na edição por segurança simples
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha</label>
+                            <input 
+                                type="text" 
+                                value={newUserPass}
+                                onChange={e => setNewUserPass(e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono"
+                                placeholder={editingUserId ? "Deixe em branco para manter" : "Senha de acesso"}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 pt-2">
+                            <input 
+                                type="checkbox"
+                                id="isAdmin"
+                                checked={newUserIsAdmin}
+                                onChange={e => setNewUserIsAdmin(e.target.checked)}
+                                className="rounded text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <label htmlFor="isAdmin" className="text-sm text-slate-700 select-none cursor-pointer">
+                                É Administrador?
+                            </label>
+                        </div>
+                        
+                        <div className="pt-4 flex gap-2">
+                             {editingUserId && (
+                                 <Button type="button" variant="secondary" onClick={resetUserForm} className="flex-1">
+                                     Cancelar
+                                 </Button>
+                             )}
+                             <Button type="submit" className="flex-1" disabled={isRegistering}>
+                                 {isRegistering ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                 {editingUserId ? 'Salvar Alterações' : 'Cadastrar'}
+                             </Button>
+                        </div>
+                    </form>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-               <div className="lg:col-span-1 bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-fit">
-                   <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                       {editingUserId ? <Edit2 className="w-4 h-4"/> : <UserPlus className="w-4 h-4" />} 
-                       {editingUserId ? 'Editar Usuário' : 'Novo Usuário'}
-                   </h4>
-                   
-                   {userMsg && (
-                       <div className={`mb-4 p-3 rounded-lg text-sm flex items-start gap-2 ${userMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                           {userMsg.type === 'success' ? <CheckCircle className="w-4 h-4 mt-0.5" /> : <AlertTriangle className="w-4 h-4 mt-0.5" />}
-                           {userMsg.text}
-                       </div>
-                   )}
-
-                   <form onSubmit={handleRegisterOrUpdateUser} className="space-y-4">
-                       <div>
-                           <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Nome Completo</label>
-                           <input 
-                             type="text" 
-                             className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
-                             value={newUserName}
-                             onChange={e => setNewUserName(e.target.value)}
-                             required
-                           />
-                       </div>
-                       <div>
-                           <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Login (Username)</label>
-                           <input 
-                             type="text" 
-                             className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
-                             value={newUserLogin}
-                             onChange={e => setNewUserLogin(e.target.value)}
-                             required
-                           />
-                       </div>
-                       <div>
-                           <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Senha</label>
-                           <input 
-                             type="text" // Visible for admin ease
-                             className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
-                             value={newUserPass}
-                             onChange={e => setNewUserPass(e.target.value)}
-                             placeholder={editingUserId ? "Deixe em branco para manter" : ""}
-                             required={!editingUserId}
-                           />
-                       </div>
-                       <div className="flex items-center gap-2 pt-2">
-                           <input 
-                             type="checkbox" 
-                             id="isAdmin"
-                             checked={newUserIsAdmin}
-                             onChange={e => setNewUserIsAdmin(e.target.checked)}
-                             className="w-4 h-4 text-indigo-600 rounded"
-                           />
-                           <label htmlFor="isAdmin" className="text-sm text-slate-700 select-none">Acesso Admin Total</label>
-                       </div>
-                       
-                       <div className="pt-2 flex gap-2">
-                           {editingUserId && (
-                               <Button type="button" variant="secondary" onClick={resetUserForm} className="flex-1">
-                                   Cancelar
-                               </Button>
-                           )}
-                           <Button type="submit" disabled={isRegistering} className="flex-1">
-                               {isRegistering ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                               Salvar
-                           </Button>
-                       </div>
-                   </form>
-               </div>
-
-               <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                   <h4 className="font-semibold text-slate-800 mb-4">Usuários Cadastrados ({usersList.length})</h4>
-                   {isLoadingUsers ? (
-                       <div className="text-center py-8 text-slate-400">Carregando...</div>
-                   ) : (
-                       <div className="space-y-3">
-                           {usersList.map(user => (
-                               <div key={user.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors bg-slate-50">
-                                   <div className="flex items-center gap-3">
-                                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}>
-                                           {user.role === 'admin' ? <ShieldCheck className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                                       </div>
-                                       <div>
-                                           <p className="font-medium text-slate-900 text-sm">{user.name}</p>
-                                           <p className="text-xs text-slate-500 flex items-center gap-1">
-                                               <span className="font-mono bg-white px-1 rounded border border-slate-200">@{user.username}</span>
-                                               {user.role === 'admin' && <span className="text-indigo-600 font-bold ml-1">ADMIN</span>}
-                                           </p>
-                                       </div>
-                                   </div>
-                                   <div className="flex items-center gap-2">
-                                       <button onClick={() => handleEditUser(user)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors">
-                                           <Edit2 className="w-4 h-4" />
-                                       </button>
-                                       {user.username !== 'admin' && (
-                                           <button onClick={() => handleDeleteUser(user.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
-                                               <Trash2 className="w-4 h-4" />
-                                           </button>
-                                       )}
-                                   </div>
-                               </div>
-                           ))}
-                       </div>
-                   )}
-               </div>
+            {/* User List */}
+            <div className="lg:col-span-2">
+                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                     <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                         <h4 className="font-semibold text-slate-800 flex items-center gap-2">
+                             <Users className="w-4 h-4" /> Usuários do Sistema
+                         </h4>
+                         <span className="text-xs text-slate-500">{usersList.length} cadastrados</span>
+                     </div>
+                     
+                     {isLoadingUsers ? (
+                         <div className="p-8 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto"/></div>
+                     ) : (
+                         <table className="w-full text-sm text-left">
+                             <thead className="bg-slate-50 text-slate-500">
+                                 <tr>
+                                     <th className="p-4 font-medium">Nome</th>
+                                     <th className="p-4 font-medium">Login</th>
+                                     <th className="p-4 font-medium">Função</th>
+                                     <th className="p-4 font-medium text-right">Ações</th>
+                                 </tr>
+                             </thead>
+                             <tbody className="divide-y divide-slate-100">
+                                 {usersList.map(user => (
+                                     <tr key={user.id} className="hover:bg-slate-50 group transition-colors">
+                                         <td className="p-4 font-medium text-slate-900 flex items-center gap-3">
+                                             <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 uppercase font-bold text-xs">
+                                                 {user.name.slice(0,2)}
+                                             </div>
+                                             {user.name}
+                                         </td>
+                                         <td className="p-4 text-slate-600 font-mono text-xs">{user.username}</td>
+                                         <td className="p-4">
+                                             {user.role === 'admin' ? (
+                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                                     <ShieldCheck className="w-3 h-3" /> Admin
+                                                 </span>
+                                             ) : (
+                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                                     <User className="w-3 h-3" /> Usuário
+                                                 </span>
+                                             )}
+                                         </td>
+                                         <td className="p-4 text-right">
+                                             <div className="flex justify-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                                                 <button 
+                                                    onClick={() => handleEditUser(user)}
+                                                    className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded"
+                                                    title="Editar"
+                                                 >
+                                                     <Edit2 className="w-4 h-4" />
+                                                 </button>
+                                                 {user.username !== 'admin' && (
+                                                     <button 
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        className="p-1.5 hover:bg-red-50 text-red-600 rounded"
+                                                        title="Excluir"
+                                                     >
+                                                         <Trash2 className="w-4 h-4" />
+                                                     </button>
+                                                 )}
+                                             </div>
+                                         </td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
+                     )}
+                 </div>
             </div>
-         </div>
+        </div>
       )}
 
       {/* --- CLOUD TAB --- */}
       {isAdmin && activeTab === 'cloud' && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center gap-4 mb-6">
-                <div className={`p-3 rounded-full ${isCloudConfigured ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-600'}`}>
-                  {isCloudConfigured ? <CheckCircle className="w-8 h-8" /> : <Cloud className="w-8 h-8" />}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">
-                    {isCloudConfigured ? 'Conectado à Nuvem (Produção)' : 'Configuração de Nuvem (Supabase)'}
-                  </h3>
-                  <p className="text-slate-500 text-sm">
-                    {isCloudConfigured 
-                      ? 'Seus dados estão sendo sincronizados em tempo real.' 
-                      : 'Conecte-se para sincronizar pedidos entre dispositivos.'}
-                  </p>
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Cloud className="w-6 h-6 text-indigo-600" />
+              Configuração da Nuvem (Supabase)
+            </h3>
+            
+            {!isOnline && (
+              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex gap-3 items-start">
+                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-amber-800">
+                  <strong>Modo Offline:</strong> O sistema está salvando dados apenas neste navegador. Configure o Supabase abaixo para sincronizar em tempo real com outros dispositivos.
                 </div>
               </div>
+            )}
 
-              {!isCloudConfigured ? (
-                <form onSubmit={(e) => handleSaveCloudConfig(e, 'prod')} className="space-y-4 max-w-lg">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Project URL</label>
-                    <input 
-                      type="text" 
-                      value={supabaseConfig.supabaseUrl}
-                      onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseUrl: e.target.value})}
-                      placeholder="https://xyz.supabase.co"
-                      className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Anon Public Key</label>
+            {isCloudConfigured && isOnline && (
+              <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex gap-3 items-start">
+                <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-emerald-800">
+                  <strong>Conectado:</strong> O sistema está sincronizado com a nuvem.
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={(e) => handleSaveCloudConfig(e, 'prod')} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Project URL</label>
+                <input 
+                  type="text" 
+                  value={supabaseConfig.supabaseUrl}
+                  onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseUrl: e.target.value})}
+                  placeholder="https://xyz.supabase.co"
+                  className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">API Key (Anon/Public)</label>
+                <div className="relative">
                     <input 
                       type="password" 
                       value={supabaseConfig.supabaseKey}
                       onChange={(e) => setSupabaseConfig({...supabaseConfig, supabaseKey: e.target.value})}
-                      placeholder="eyJh..."
-                      className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
-                      required
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white pr-10"
                     />
-                  </div>
+                    <Lock className="absolute right-3 top-2.5 w-4 h-4 text-slate-400" />
+                </div>
+              </div>
 
-                  {testResult && !testResult.success && (
-                    <div className="p-3 bg-red-50 text-red-700 text-sm rounded border border-red-200 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4" />
-                      {testResult.message}
-                    </div>
-                  )}
-
-                  <Button type="submit" disabled={isTesting}>
-                    {isTesting ? 'Testando Conexão...' : 'Salvar e Conectar'}
-                  </Button>
-                  
-                  <div className="mt-4 pt-4 border-t border-slate-100">
-                     <p className="text-xs text-slate-500 mb-2">Ainda não tem o banco configurado?</p>
-                     <div className="flex gap-2">
-                       <Button type="button" variant="outline" size="sm" onClick={() => setShowSqlPreview(!showSqlPreview)}>
-                          {showSqlPreview ? <EyeOff className="w-3 h-3 mr-2" /> : <Eye className="w-3 h-3 mr-2" />} 
-                          {showSqlPreview ? 'Ocultar Script SQL' : 'Ver Script SQL'}
-                       </Button>
-                       <Button type="button" variant="outline" size="sm" onClick={copySql}>
-                          <Copy className="w-3 h-3 mr-2" /> Copiar
-                       </Button>
-                     </div>
-                     
-                     {showSqlPreview && (
-                        <div className="mt-3 bg-slate-800 rounded-lg p-3 overflow-hidden border border-slate-700 animate-fade-in">
-                            <pre className="text-[10px] text-emerald-400 font-mono overflow-auto max-h-64 whitespace-pre-wrap">
-                                {getSqlScript()}
-                            </pre>
-                        </div>
-                     )}
-                  </div>
-                </form>
-              ) : (
-                <div className="space-y-6">
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="block text-slate-500 text-xs uppercase font-bold">URL do Projeto</span>
-                        <span className="font-mono text-slate-700">{supabaseConfig.supabaseUrl}</span>
-                      </div>
-                      <div>
-                        <span className="block text-slate-500 text-xs uppercase font-bold">Status</span>
-                        <span className="text-green-600 font-bold flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-green-500"></span> Online
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-3">
-                    <Button variant="danger" onClick={handleClearCloudConfig}>
-                      <CloudOff className="w-4 h-4 mr-2" />
-                      Desconectar
-                    </Button>
-                    <div className="flex gap-2">
-                         <Button variant="outline" onClick={() => setShowSqlPreview(!showSqlPreview)}>
-                           {showSqlPreview ? <EyeOff className="w-4 h-4 mr-2" /> : <Database className="w-4 h-4 mr-2" />}
-                           {showSqlPreview ? 'Ocultar SQL' : 'Ver SQL'}
-                         </Button>
-                         <Button variant="outline" onClick={copySql}>
-                            <Copy className="w-4 h-4 mr-2" />
-                            Copiar
-                         </Button>
-                    </div>
-                  </div>
-
-                  {showSqlPreview && (
-                        <div className="mt-4 bg-slate-800 rounded-lg p-4 overflow-hidden border border-slate-700 animate-fade-in">
-                            <div className="flex justify-between items-center mb-2 border-b border-slate-700 pb-2">
-                                <span className="text-slate-400 text-xs font-mono">setup_database.sql</span>
-                                <span className="text-xs text-emerald-500">v18</span>
-                            </div>
-                            <pre className="text-xs text-emerald-300 font-mono overflow-auto max-h-80 whitespace-pre-wrap">
-                                {getSqlScript()}
-                            </pre>
-                        </div>
-                   )}
+              {testResult && (
+                <div className={`p-3 rounded-lg text-sm ${testResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {testResult.success ? 'Conexão realizada com sucesso! Configuração salva.' : `Falha na conexão: ${testResult.message}`}
                 </div>
               )}
+
+              <div className="pt-2 flex gap-3">
+                <Button type="submit" disabled={isTesting} className="flex-1">
+                  {isTesting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                  Testar e Salvar Conexão
+                </Button>
+                {isCloudConfigured && (
+                   <Button type="button" variant="danger" onClick={handleClearCloudConfig}>
+                      <CloudOff className="w-4 h-4" />
+                   </Button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-slate-900 text-slate-300 p-6 rounded-xl border border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-bold text-white flex items-center gap-2">
+                <Database className="w-4 h-4" /> Script SQL Inicial
+              </h4>
+              <button 
+                onClick={copySql}
+                className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-md transition-colors flex items-center gap-1"
+              >
+                <Copy className="w-3 h-3" /> Copiar SQL
+              </button>
+            </div>
+            <p className="text-xs mb-4 leading-relaxed">
+              Para o sistema funcionar, você precisa criar as tabelas no Supabase. 
+              Copie o código abaixo e cole no <strong>SQL Editor</strong> do seu projeto Supabase.
+            </p>
+            <div className="bg-black/50 p-4 rounded-lg font-mono text-[10px] overflow-x-auto border border-slate-700 max-h-40">
+               <pre className="text-emerald-400">{getSqlScript()}</pre>
             </div>
           </div>
         </div>
@@ -1146,43 +1136,47 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
 
       {/* --- TESTING TAB --- */}
       {isAdmin && activeTab === 'testing' && (
-         <div className="space-y-6">
-             <div className="flex items-center gap-3 mb-6">
-                 <div className="p-3 bg-orange-100 rounded-full text-orange-600">
-                    <Beaker className="w-6 h-6" />
-                 </div>
-                 <div>
-                    <h3 className="text-lg font-bold text-slate-900">Ambiente de Testes (Sandbox)</h3>
-                    <p className="text-sm text-slate-500">Configure um banco de dados separado para testes seguros.</p>
-                 </div>
-            </div>
+        <div className="max-w-2xl mx-auto space-y-6">
+           <div className="bg-orange-50 border border-orange-200 p-6 rounded-xl text-center">
+               <Beaker className="w-12 h-12 text-orange-500 mx-auto mb-3" />
+               <h3 className="text-lg font-bold text-orange-800 mb-2">Área de Sandbox (Testes)</h3>
+               <p className="text-sm text-orange-700 mb-6">
+                   Configure um banco de dados separado para testes. Isso permite que você experimente novas funcionalidades 
+                   sem sujar os dados de produção.
+               </p>
 
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-               <div className="flex justify-between items-center mb-6 pb-6 border-b border-slate-100">
-                  <div>
-                      <h4 className="font-bold text-slate-800">Status do Ambiente</h4>
-                      <p className="text-sm text-slate-500">Você está atualmente em: <strong className="uppercase">{currentEnv === 'prod' ? 'Produção' : 'Testes'}</strong></p>
-                  </div>
-                  <div className="flex gap-2">
-                      <Button 
-                         variant={currentEnv === 'prod' ? 'primary' : 'outline'} 
-                         onClick={() => handleSwitchEnv('prod')}
-                         className={currentEnv === 'prod' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                      >
-                         Produção
-                      </Button>
-                      <Button 
-                         variant={currentEnv === 'test' ? 'primary' : 'outline'} 
-                         onClick={() => handleSwitchEnv('test')}
-                         className={currentEnv === 'test' ? 'bg-orange-600 hover:bg-orange-700' : ''}
-                      >
-                         Testes
-                      </Button>
-                  </div>
+               <div className="flex justify-center gap-4">
+                   <button 
+                     onClick={() => handleSwitchEnv('prod')}
+                     className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition-all ${
+                         currentEnv === 'prod' 
+                         ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-200' 
+                         : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                     }`}
+                   >
+                       <ShieldCheck className="w-5 h-5" />
+                       Ambiente de Produção
+                       {currentEnv === 'prod' && <span className="ml-2 bg-white/20 px-2 py-0.5 rounded text-[10px]">ATIVO</span>}
+                   </button>
+
+                   <button 
+                     onClick={() => handleSwitchEnv('test')}
+                     className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition-all ${
+                         currentEnv === 'test' 
+                         ? 'bg-orange-600 text-white shadow-lg ring-2 ring-orange-200' 
+                         : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                     }`}
+                   >
+                       <Beaker className="w-5 h-5" />
+                       Ambiente de Testes
+                       {currentEnv === 'test' && <span className="ml-2 bg-white/20 px-2 py-0.5 rounded text-[10px]">ATIVO</span>}
+                   </button>
                </div>
+           </div>
 
-               <h4 className="font-bold text-slate-800 mb-4">Configuração do Banco de Testes</h4>
-               <form onSubmit={(e) => handleSaveCloudConfig(e, 'test')} className="space-y-4 max-w-lg">
+           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm opacity-90 hover:opacity-100 transition-opacity">
+               <h4 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Configuração do Banco de Testes</h4>
+               <form onSubmit={(e) => handleSaveCloudConfig(e, 'test')} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Test Project URL</label>
                     <input 
@@ -1194,31 +1188,27 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Test Anon Key</label>
-                    <input 
-                      type="password" 
-                      value={testConfig.supabaseKey}
-                      onChange={(e) => setTestConfig({...testConfig, supabaseKey: e.target.value})}
-                      placeholder="eyJh..."
-                      className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
-                    />
-                  </div>
-                  
-                  {testResult && !testResult.success && activeTab === 'testing' && (
-                    <div className="p-3 bg-red-50 text-red-700 text-sm rounded border border-red-200 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4" />
-                      {testResult.message}
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Test API Key</label>
+                    <div className="relative">
+                        <input 
+                          type="password" 
+                          value={testConfig.supabaseKey}
+                          onChange={(e) => setTestConfig({...testConfig, supabaseKey: e.target.value})}
+                          placeholder="Key do projeto de teste..."
+                          className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white pr-10"
+                        />
+                         <Lock className="absolute right-3 top-2.5 w-4 h-4 text-slate-400" />
                     </div>
-                  )}
-
-                  <Button type="submit" disabled={isTesting}>
-                    {isTesting ? 'Verificando...' : 'Salvar Configuração de Teste'}
+                  </div>
+                  <Button type="submit" variant="secondary" disabled={isTesting} className="w-full border-orange-200 text-orange-700 hover:bg-orange-50">
+                      {isTesting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                      Salvar Configuração de Teste
                   </Button>
                </form>
-            </div>
-         </div>
+           </div>
+        </div>
       )}
-      
+
       {activeTab === 'products' && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Color Management */}

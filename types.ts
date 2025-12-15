@@ -55,9 +55,16 @@ export interface Filament {
   quantity: number;
 }
 
+export interface Subcategory {
+  id: string;
+  name: string;
+  categoryId: string;
+}
+
 export interface Category {
   id: string;
   name: string;
+  subcategories?: Subcategory[];
 }
 
 export interface Banner {
@@ -74,6 +81,7 @@ export interface CatalogProduct {
   price: number;
   imageUrl: string;
   category: string;
+  subcategory?: string; // New field
   highlight: boolean;
 }
 

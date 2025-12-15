@@ -18,6 +18,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentBanner, setCurrentBanner] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
 
   useEffect(() => {
     // Carrega os dados sempre que montar, ou quando a conexão online for restabelecida
@@ -64,9 +65,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
     }
   ] as Banner[];
 
-  const filteredProducts = selectedCategory === 'Todos' 
-    ? products 
-    : products.filter(p => p.category === selectedCategory);
+  const filteredProducts = products.filter(p => {
+    if (selectedCategory === 'Todos') return true;
+    if (p.category !== selectedCategory) return false;
+    if (selectedSubcategory && p.subcategory !== selectedSubcategory) return false;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -136,10 +140,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
       {/* --- CATEGORY NAV (Moved Above Banner) --- */}
       <section className="sticky top-16 z-40 bg-indigo-900 text-white shadow-md border-t border-indigo-800">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-1 overflow-x-auto h-12 no-scrollbar">
+            <div className="flex items-center gap-1 overflow-visible h-12">
                 {/* 'Todos' Button */}
                 <button
-                    onClick={() => setSelectedCategory('Todos')}
+                    onClick={() => { setSelectedCategory('Todos'); setSelectedSubcategory(null); }}
                     className={`px-4 h-full flex items-center gap-2 text-sm font-medium transition-all whitespace-nowrap border-b-2 ${
                         selectedCategory === 'Todos' 
                         ? 'border-sky-400 text-white bg-white/10' 
@@ -155,18 +159,46 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
 
                 {/* Categories */}
                 {categories.map(cat => (
-                    <button
-                        key={cat.id}
-                        onClick={() => setSelectedCategory(cat.name)}
-                        className={`group px-4 h-full flex items-center gap-1 text-sm font-medium transition-all whitespace-nowrap border-b-2 ${
-                            selectedCategory === cat.name
-                            ? 'border-sky-400 text-white bg-white/10' 
-                            : 'border-transparent text-indigo-100 hover:text-white hover:bg-white/5'
-                        }`}
-                    >
-                        {cat.name}
-                        <ChevronDown className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity mt-0.5" />
-                    </button>
+                    <div key={cat.id} className="relative group h-full">
+                        <button
+                            onClick={() => { setSelectedCategory(cat.name); setSelectedSubcategory(null); }}
+                            className={`px-4 h-full flex items-center gap-1 text-sm font-medium transition-all whitespace-nowrap border-b-2 ${
+                                selectedCategory === cat.name
+                                ? 'border-sky-400 text-white bg-white/10' 
+                                : 'border-transparent text-indigo-100 hover:text-white hover:bg-white/5'
+                            }`}
+                        >
+                            {cat.name}
+                            {cat.subcategories && cat.subcategories.length > 0 && (
+                                <ChevronDown className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity mt-0.5" />
+                            )}
+                        </button>
+                        
+                        {/* Subcategory Dropdown - Styled like photo */}
+                        {cat.subcategories && cat.subcategories.length > 0 && (
+                            <div className="hidden group-hover:block absolute left-0 top-full bg-white shadow-xl rounded-b-md py-2 min-w-[200px] z-50 animate-fade-in border-t-2 border-indigo-600">
+                                <div className="flex flex-col">
+                                    {cat.subcategories.map(sub => (
+                                        <button
+                                            key={sub.id}
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent bubbling if nested logic changes
+                                                setSelectedCategory(cat.name);
+                                                setSelectedSubcategory(sub.name);
+                                            }}
+                                            className={`text-left px-4 py-2.5 text-sm transition-colors hover:bg-slate-50 ${
+                                                selectedCategory === cat.name && selectedSubcategory === sub.name
+                                                ? 'text-indigo-600 font-bold bg-indigo-50'
+                                                : 'text-slate-600 hover:text-indigo-600'
+                                            }`}
+                                        >
+                                            {sub.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 ))}
             </div>
          </div>
@@ -210,10 +242,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
         
         {/* Section Title */}
         <div className="flex items-center justify-between mb-8">
-             <h2 className="text-2xl font-bold text-slate-900 relative pl-4">
-                 <span className="absolute left-0 top-1 bottom-1 w-1 bg-indigo-600 rounded-full"></span>
-                 {selectedCategory === 'Todos' ? 'Destaques e Novidades' : `Categoria: ${selectedCategory}`}
-             </h2>
+             <div className="flex flex-col">
+                 <h2 className="text-2xl font-bold text-slate-900 relative pl-4">
+                     <span className="absolute left-0 top-1 bottom-1 w-1 bg-indigo-600 rounded-full"></span>
+                     {selectedCategory === 'Todos' ? 'Destaques e Novidades' : `Categoria: ${selectedCategory}`}
+                 </h2>
+                 {selectedSubcategory && (
+                     <span className="text-sm text-indigo-600 font-medium ml-4 mt-1 flex items-center gap-1">
+                         <ChevronDown className="w-3 h-3 rotate-[-90deg]" /> {selectedSubcategory}
+                     </span>
+                 )}
+             </div>
              <span className="text-sm text-slate-500 hidden sm:block">
                  Mostrando {filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''}
              </span>
@@ -231,10 +270,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
                  <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                  <h3 className="text-lg font-medium text-slate-600">Nenhum produto encontrado</h3>
                  <p className="text-slate-400 text-sm">
-                     Não há produtos nesta categoria no momento.
+                     Não há produtos nesta categoria/subcategoria no momento.
                  </p>
                  <button 
-                    onClick={() => setSelectedCategory('Todos')}
+                    onClick={() => { setSelectedCategory('Todos'); setSelectedSubcategory(null); }}
                     className="mt-4 text-indigo-600 text-sm font-medium hover:underline"
                  >
                      Ver todos os produtos
@@ -266,7 +305,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterProduction, isO
                         </div>
 
                         <div className="p-4 flex-1 flex flex-col">
-                            <div className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider mb-1">{product.category || 'Geral'}</div>
+                            <div className="flex flex-col mb-1">
+                                <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider">{product.category || 'Geral'}</span>
+                                {product.subcategory && (
+                                    <span className="text-[9px] text-slate-400 font-medium flex items-center gap-0.5">
+                                        <ChevronDown className="w-2 h-2 -rotate-90" /> {product.subcategory}
+                                    </span>
+                                )}
+                            </div>
                             <h3 className="font-bold text-slate-900 mb-1 leading-tight">{product.name}</h3>
                             <p className="text-xs text-slate-500 line-clamp-2 mb-4 flex-1">{product.description}</p>
                             

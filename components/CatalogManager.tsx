@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Tag, DollarSign, Image as ImageIcon, Loader2, ShoppingBag, LayoutTemplate, Layers, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, Tag, DollarSign, Image as ImageIcon, Loader2, ShoppingBag, LayoutTemplate, Layers, FolderOpen, ArrowRight, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { CatalogProduct, Category, Banner } from '../types';
 import { 
@@ -12,7 +12,9 @@ import {
   deleteCategory,
   fetchBanners,
   addBanner,
-  deleteBanner
+  deleteBanner,
+  addSubcategory,
+  deleteSubcategory
 } from '../services/supabase';
 
 export const CatalogManager: React.FC = () => {
@@ -27,6 +29,8 @@ export const CatalogManager: React.FC = () => {
   // Categories State
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newSubcategoryName, setNewSubcategoryName] = useState('');
+  const [addingSubToCategory, setAddingSubToCategory] = useState<string | null>(null);
 
   // Banners State
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -42,13 +46,15 @@ export const CatalogManager: React.FC = () => {
     price: string;
     imageUrl: string;
     category: string;
+    subcategory: string;
     highlight: boolean;
   }>({
     name: '',
     description: '',
     price: '',
     imageUrl: '',
-    category: '', // Start empty
+    category: '', 
+    subcategory: '',
     highlight: false
   });
 
@@ -109,6 +115,7 @@ export const CatalogManager: React.FC = () => {
         price: parseFloat(newItem.price.replace(',', '.')),
         imageUrl: newItem.imageUrl,
         category: newItem.category || (categories[0]?.name || 'Geral'),
+        subcategory: newItem.subcategory,
         highlight: newItem.highlight
       });
       
@@ -118,6 +125,7 @@ export const CatalogManager: React.FC = () => {
         price: '',
         imageUrl: '',
         category: categories[0]?.name || '',
+        subcategory: '',
         highlight: false
       });
       
@@ -148,10 +156,29 @@ export const CatalogManager: React.FC = () => {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if(confirm("Excluir categoria?")) {
+    if(confirm("Excluir categoria e todas as suas subcategorias?")) {
       await deleteCategory(id);
       loadCategories();
     }
+  };
+
+  // --- Subcategory Handlers ---
+  const handleAddSubcategory = async (e: React.FormEvent, categoryId: string) => {
+    e.preventDefault();
+    if(!newSubcategoryName) return;
+    try {
+        await addSubcategory(newSubcategoryName, categoryId);
+        setNewSubcategoryName('');
+        setAddingSubToCategory(null);
+        loadCategories();
+    } catch(e) { alert("Erro ao criar subcategoria"); }
+  };
+
+  const handleDeleteSubcategory = async (id: string) => {
+      if(confirm("Excluir subcategoria?")) {
+          await deleteSubcategory(id);
+          loadCategories();
+      }
   };
 
   // --- Banner Handlers ---
@@ -171,6 +198,10 @@ export const CatalogManager: React.FC = () => {
       loadBanners();
     }
   };
+
+  // Derived state for current selected category subcategories
+  const currentCategoryObj = categories.find(c => c.name === newItem.category);
+  const currentSubcategories = currentCategoryObj?.subcategories || [];
 
 
   return (
@@ -281,11 +312,12 @@ export const CatalogManager: React.FC = () => {
                       placeholder="Breve descrição do item..."
                   />
               </div>
+              
               <div className="md:col-span-1">
-                  <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Categoria</label>
+                  <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Categoria Principal</label>
                   <select 
                       value={newItem.category}
-                      onChange={e => setNewItem({...newItem, category: e.target.value})}
+                      onChange={e => setNewItem({...newItem, category: e.target.value, subcategory: ''})}
                       className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white"
                   >
                       {categories.length === 0 && <option value="">Sem categorias cadastradas</option>}
@@ -293,10 +325,23 @@ export const CatalogManager: React.FC = () => {
                           <option key={cat.id} value={cat.name}>{cat.name}</option>
                       ))}
                   </select>
-                  {categories.length === 0 && (
-                      <p className="text-[10px] text-red-500 mt-1">Cadastre categorias na aba "Categorias" primeiro.</p>
-                  )}
               </div>
+
+              <div className="md:col-span-1">
+                  <label className="block text-xs font-medium text-slate-500 uppercase mb-1">Subcategoria (Opcional)</label>
+                  <select 
+                      value={newItem.subcategory}
+                      onChange={e => setNewItem({...newItem, subcategory: e.target.value})}
+                      className="w-full rounded-lg border-slate-300 border p-2 text-sm bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                      disabled={currentSubcategories.length === 0}
+                  >
+                      <option value="">{currentSubcategories.length === 0 ? 'Nenhuma subcategoria disponível' : 'Selecione (Opcional)'}</option>
+                      {currentSubcategories.map(sub => (
+                          <option key={sub.id} value={sub.name}>{sub.name}</option>
+                      ))}
+                  </select>
+              </div>
+
               <div className="md:col-span-1 flex items-end">
                   <label className="flex items-center gap-2 p-2 border border-slate-200 rounded-lg w-full cursor-pointer hover:bg-slate-50">
                       <input 
@@ -342,11 +387,19 @@ export const CatalogManager: React.FC = () => {
                           )}
                       </div>
                       <div className="p-4 flex-1 flex flex-col">
-                          <div className="flex justify-between items-start mb-2">
+                          <div className="flex flex-col mb-2">
                               <h5 className="font-bold text-slate-900 leading-tight">{product.name}</h5>
-                              <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100 whitespace-nowrap ml-2">
-                                  {product.category}
-                              </span>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100 whitespace-nowrap">
+                                    {product.category}
+                                </span>
+                                {product.subcategory && (
+                                    <span className="text-xs bg-slate-50 text-slate-600 px-2 py-0.5 rounded border border-slate-100 whitespace-nowrap flex items-center gap-1">
+                                        <ArrowRight className="w-2 h-2" />
+                                        {product.subcategory}
+                                    </span>
+                                )}
+                              </div>
                           </div>
                           <p className="text-xs text-slate-500 mb-3 line-clamp-2">{product.description}</p>
                           <div className="mt-auto flex items-center justify-between pt-3 border-t border-slate-100">
@@ -370,7 +423,7 @@ export const CatalogManager: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-fit">
                 <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                    <Tag className="w-4 h-4" /> Nova Categoria
+                    <Tag className="w-4 h-4" /> Nova Categoria Principal
                 </h4>
                 <form onSubmit={handleAddCategory} className="flex gap-2">
                     <input 
@@ -388,15 +441,64 @@ export const CatalogManager: React.FC = () => {
             </div>
 
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                 <h4 className="font-semibold text-slate-800 mb-4">Categorias Ativas ({categories.length})</h4>
-                 <div className="space-y-2">
+                 <h4 className="font-semibold text-slate-800 mb-4">Categorias & Subcategorias</h4>
+                 <div className="space-y-4">
                     {categories.length === 0 && <p className="text-sm text-slate-500">Nenhuma categoria encontrada.</p>}
                     {categories.map(cat => (
-                        <div key={cat.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                             <span className="font-medium text-slate-700">{cat.name}</span>
-                             <button onClick={() => handleDeleteCategory(cat.id)} className="text-slate-400 hover:text-red-500">
-                                 <Trash2 className="w-4 h-4" />
-                             </button>
+                        <div key={cat.id} className="bg-slate-50 rounded-lg border border-slate-100 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="font-bold text-slate-800">{cat.name}</span>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => setAddingSubToCategory(cat.id)}
+                                        className="text-indigo-500 hover:text-indigo-700 text-xs font-medium bg-white px-2 py-1 rounded border border-slate-200"
+                                    >
+                                        + Sub
+                                    </button>
+                                    <button onClick={() => handleDeleteCategory(cat.id)} className="text-slate-400 hover:text-red-500">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Subcategories List */}
+                            <div className="pl-4 space-y-1 border-l-2 border-slate-200 ml-1">
+                                {cat.subcategories && cat.subcategories.length > 0 ? (
+                                    cat.subcategories.map(sub => (
+                                        <div key={sub.id} className="flex items-center justify-between text-sm group">
+                                            <span className="text-slate-600">{sub.name}</span>
+                                            <button 
+                                                onClick={() => handleDeleteSubcategory(sub.id)}
+                                                className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-xs text-slate-400 italic">Sem subcategorias</p>
+                                )}
+                                
+                                {/* Add Sub Form (Inline) */}
+                                {addingSubToCategory === cat.id && (
+                                    <form onSubmit={(e) => handleAddSubcategory(e, cat.id)} className="flex gap-2 mt-2">
+                                        <input 
+                                            type="text"
+                                            value={newSubcategoryName}
+                                            onChange={e => setNewSubcategoryName(e.target.value)}
+                                            placeholder="Nome da sub..."
+                                            className="w-full text-xs p-1 rounded border border-slate-300"
+                                            autoFocus
+                                        />
+                                        <button type="submit" className="text-green-600 bg-green-50 p-1 rounded border border-green-200">
+                                            <Plus className="w-3 h-3" />
+                                        </button>
+                                        <button type="button" onClick={() => setAddingSubToCategory(null)} className="text-slate-400 bg-white p-1 rounded border border-slate-200">
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </form>
+                                )}
+                            </div>
                         </div>
                     ))}
                  </div>

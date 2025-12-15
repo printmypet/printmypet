@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture, AppUser, Filament, ProductConfig, CatalogProduct, Category, Banner } from '../types';
+import { SupabaseConfig, Order, Customer, PartsColors, ColorOption, Texture, AppUser, Filament, ProductConfig, CatalogProduct, Category, Banner, Subcategory } from '../types';
 
 let supabase: SupabaseClient | undefined;
 
@@ -323,12 +323,31 @@ export const updateFilamentQuantity = async (id: string, quantity: number) => {
 
 export const fetchCategories = async (): Promise<Category[]> => {
   if (!supabase) return [];
-  const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
+  
+  // 1. Fetch Categories
+  const { data: categories, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
   if (error) {
      if (error.code !== '42P01') console.error("Error fetching categories:", error.message);
      return [];
   }
-  return data;
+
+  // 2. Fetch Subcategories
+  const { data: subcategories, error: subError } = await supabase.from('subcategories').select('*').order('name', { ascending: true });
+  
+  if (subError && subError.code !== '42P01') {
+      console.error("Error fetching subcategories:", subError.message);
+  }
+
+  // 3. Map together
+  return categories.map((cat: any) => ({
+      id: cat.id,
+      name: cat.name,
+      subcategories: subcategories 
+        ? subcategories
+            .filter((sub: any) => sub.category_id === cat.id)
+            .map((sub: any) => ({ id: sub.id, name: sub.name, categoryId: sub.category_id })) 
+        : []
+  }));
 };
 
 export const addCategory = async (name: string) => {
@@ -340,6 +359,20 @@ export const addCategory = async (name: string) => {
 export const deleteCategory = async (id: string) => {
   if (!supabase) return;
   const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw error;
+};
+
+// --- Catalog Subcategories Management ---
+
+export const addSubcategory = async (name: string, categoryId: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('subcategories').insert([{ name, category_id: categoryId }]);
+  if (error) throw error;
+};
+
+export const deleteSubcategory = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('subcategories').delete().eq('id', id);
   if (error) throw error;
 };
 
@@ -396,6 +429,7 @@ export const fetchCatalogProducts = async (): Promise<CatalogProduct[]> => {
     price: item.price,
     imageUrl: item.image_url,
     category: item.category,
+    subcategory: item.subcategory, // Mapped new field
     highlight: item.highlight
   }));
 };
@@ -409,6 +443,7 @@ export const addCatalogProduct = async (product: Omit<CatalogProduct, 'id'>) => 
     price: product.price,
     image_url: product.imageUrl,
     category: product.category,
+    subcategory: product.subcategory, // Mapped new field
     highlight: product.highlight
   };
 
