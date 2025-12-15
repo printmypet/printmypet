@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { ChevronLeft, ChevronRight, LogIn, ShoppingBag, Plus, X, Search, Filter, Instagram, Phone, Mail, MapPin, CheckCircle, ArrowRight, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogIn, ShoppingBag, Plus, X, Search, Filter, Instagram, Phone, Mail, MapPin, CheckCircle, ArrowRight, ExternalLink, ChevronDown } from 'lucide-react';
 import { Banner, CatalogProduct, Category, Order, PartsColors } from '../types';
 import { fetchBanners, fetchCatalogProducts, fetchCategories, addOrderToSupabase } from '../services/supabase';
 import { Button } from './ui/Button';
@@ -25,6 +25,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -102,17 +103,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   const filteredProducts = products.filter(p => {
     const matchesCategory = selectedCategory === 'Todos' || p.category === selectedCategory;
+    const matchesSubcategory = !selectedSubcategory || p.subcategory === selectedSubcategory;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesCategory && matchesSubcategory && matchesSearch;
   });
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       
       {/* --- NAVBAR --- */}
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2 font-logo select-none">
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm h-16">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
+            <div className="flex items-center gap-2 font-logo select-none cursor-pointer" onClick={() => { setSelectedCategory('Todos'); setSelectedSubcategory(null); window.scrollTo(0,0); }}>
                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">P</div>
                <span className="text-xl font-bold text-slate-900 tracking-tight">PrintMy<span className="text-sky-500">[]</span>3D</span>
             </div>
@@ -137,8 +139,75 @@ export const LandingPage: React.FC<LandingPageProps> = ({
          </div>
       </nav>
 
+      {/* --- CATEGORY NAV --- */}
+      <div className="sticky top-16 z-40 bg-indigo-900 text-white shadow-md border-t border-indigo-800">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-1 overflow-x-auto h-12 scrollbar-hide">
+                {/* 'Todos' Button */}
+                <button
+                    onClick={() => { setSelectedCategory('Todos'); setSelectedSubcategory(null); }}
+                    className={`px-4 h-full flex items-center gap-2 text-sm font-medium transition-all whitespace-nowrap border-b-2 ${
+                        selectedCategory === 'Todos' 
+                        ? 'border-sky-400 text-white bg-white/10' 
+                        : 'border-transparent text-indigo-100 hover:text-white hover:bg-white/5'
+                    }`}
+                >
+                   <Filter className="w-4 h-4" />
+                   Todos
+                </button>
+                
+                {/* Separator */}
+                <div className="w-px h-4 bg-indigo-800 mx-2 hidden sm:block"></div>
+
+                {/* Categories */}
+                {categories.map(cat => (
+                    <div key={cat.id} className="relative group h-full">
+                        <button
+                            onClick={() => { setSelectedCategory(cat.name); setSelectedSubcategory(null); }}
+                            className={`px-4 h-full flex items-center gap-1 text-sm font-medium transition-all whitespace-nowrap border-b-2 ${
+                                selectedCategory === cat.name
+                                ? 'border-sky-400 text-white bg-white/10' 
+                                : 'border-transparent text-indigo-100 hover:text-white hover:bg-white/5'
+                            }`}
+                        >
+                            {cat.name}
+                            {cat.subcategories && cat.subcategories.length > 0 && (
+                                <ChevronDown className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity mt-0.5" />
+                            )}
+                        </button>
+                        
+                        {/* Subcategory Dropdown */}
+                        {cat.subcategories && cat.subcategories.length > 0 && (
+                            <div className="hidden group-hover:block absolute left-0 top-full bg-white shadow-xl rounded-b-md py-2 min-w-[200px] z-50 animate-fade-in border-t-2 border-indigo-600">
+                                <div className="flex flex-col">
+                                    {cat.subcategories.map(sub => (
+                                        <button
+                                            key={sub.id}
+                                            onClick={(e) => {
+                                                e.stopPropagation(); 
+                                                setSelectedCategory(cat.name);
+                                                setSelectedSubcategory(sub.name);
+                                            }}
+                                            className={`text-left px-4 py-2.5 text-sm transition-colors hover:bg-slate-50 ${
+                                                selectedCategory === cat.name && selectedSubcategory === sub.name
+                                                ? 'text-indigo-600 font-bold bg-indigo-50'
+                                                : 'text-slate-600 hover:text-indigo-600'
+                                            }`}
+                                        >
+                                            {sub.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+         </div>
+      </div>
+
       {/* --- HERO BANNER --- */}
-      <section className="relative w-full aspect-[5/4] sm:aspect-[16/7] md:aspect-[21/7] bg-slate-900 overflow-hidden group">
+      <section className="relative w-full aspect-[21/10] sm:aspect-[4/1] md:aspect-[5/1] bg-slate-900 overflow-hidden group">
          {/* Banner Image */}
          {activeBanners.length > 0 ? (
              <div className="absolute inset-0">
@@ -153,8 +222,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
          ) : (
              <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 to-slate-900 flex items-center justify-center">
                  <div className="text-center p-6">
-                    <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight">Impressão 3D Personalizada</h1>
-                    <p className="text-indigo-200 text-lg md:text-xl max-w-2xl mx-auto">Transformamos suas ideias em realidade com qualidade e precisão.</p>
+                    <h1 className="text-2xl md:text-4xl font-bold text-white mb-2 tracking-tight">Impressão 3D Personalizada</h1>
+                    <p className="text-indigo-200 text-sm md:text-lg max-w-2xl mx-auto">Transformamos suas ideias em realidade.</p>
                  </div>
              </div>
          )}
@@ -164,24 +233,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({
              <>
                  <button 
                     onClick={prevBanner}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/10 hover:bg-white/20 text-white w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-all border border-white/20"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/10 hover:bg-white/20 text-white w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-all border border-white/20"
                  >
-                     <ChevronLeft className="w-6 h-6" />
+                     <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
                  </button>
                  <button 
                     onClick={nextBanner}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/10 hover:bg-white/20 text-white w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-all border border-white/20"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/10 hover:bg-white/20 text-white w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-all border border-white/20"
                  >
-                     <ChevronRight className="w-6 h-6" />
+                     <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
                  </button>
                  
                  {/* Indicators */}
-                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                      {activeBanners.map((_, idx) => (
                          <button 
                             key={idx}
                             onClick={() => setCurrentBanner(idx)} 
-                            className={`w-2 h-2 rounded-full transition-all ${currentBanner === idx ? 'bg-white w-6' : 'bg-white/40 hover:bg-white/60'}`}
+                            className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full transition-all ${currentBanner === idx ? 'bg-white w-4 md:w-6' : 'bg-white/40 hover:bg-white/60'}`}
                          ></button>
                      ))}
                  </div>
@@ -191,13 +260,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
          {/* Hero CTA Content (Overlay) */}
          {activeBanners.length > 0 && (
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                <div className="text-center px-4 mt-10 md:mt-20">
-                     <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 drop-shadow-lg opacity-0 animate-fade-in-up" style={{animationDelay: '0.2s'}}>
+                <div className="text-center px-4">
+                     <h2 className="text-2xl md:text-4xl font-bold text-white mb-4 drop-shadow-lg opacity-0 animate-fade-in-up" style={{animationDelay: '0.2s'}}>
                          Qualidade em cada camada
                      </h2>
                      <button 
                         onClick={() => setShowOrderModal(true)}
-                        className="pointer-events-auto bg-indigo-600 text-white px-8 py-3 rounded-full font-bold text-lg hover:bg-indigo-500 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 opacity-0 animate-fade-in-up" 
+                        className="pointer-events-auto bg-indigo-600 text-white px-6 py-2 md:px-8 md:py-3 rounded-full font-bold text-sm md:text-lg hover:bg-indigo-500 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 opacity-0 animate-fade-in-up" 
                         style={{animationDelay: '0.4s'}}
                      >
                          Fazer Pedido Agora
@@ -214,9 +283,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
              <div>
                  <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                      <ShoppingBag className="w-6 h-6 text-indigo-600" />
-                     Nossos Produtos
+                     {selectedCategory === 'Todos' ? 'Destaques e Novidades' : selectedCategory}
                  </h2>
-                 <p className="text-slate-500">Explore nossa coleção de itens prontos para impressão</p>
+                 <div className="text-slate-500 flex items-center gap-2">
+                    {selectedSubcategory ? (
+                        <span className="flex items-center gap-1 text-sm bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100">
+                            {selectedSubcategory} 
+                            <button onClick={() => setSelectedSubcategory(null)} className="hover:text-red-500"><X className="w-3 h-3"/></button>
+                        </span>
+                    ) : (
+                        <span className="text-sm">Explore nossa coleção de itens prontos para impressão</span>
+                    )}
+                 </div>
              </div>
 
              <div className="flex flex-wrap gap-2 items-center">
@@ -233,25 +311,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
              </div>
          </div>
 
-         {/* Categories Filter */}
-         <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
-             <button 
-                onClick={() => setSelectedCategory('Todos')}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors border ${selectedCategory === 'Todos' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-             >
-                Todos
-             </button>
-             {categories.map(cat => (
-                 <button 
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.name)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors border ${selectedCategory === cat.name ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                 >
-                    {cat.name}
-                 </button>
-             ))}
-         </div>
-
          {/* Products Grid */}
          {filteredProducts.length === 0 ? (
              <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
@@ -263,10 +322,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                      Tente ajustar os filtros ou sua busca. Ou faça um pedido personalizado!
                  </p>
                  <button 
-                    onClick={() => setShowOrderModal(true)}
+                    onClick={() => { setSelectedCategory('Todos'); setSelectedSubcategory(null); setSearchQuery(''); }}
                     className="mt-6 text-indigo-600 font-medium hover:underline"
                  >
-                     Fazer pedido personalizado
+                     Limpar filtros
                  </button>
              </div>
          ) : (
@@ -296,7 +355,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                              <div className="flex justify-between items-start mb-2">
                                  <div>
                                      <h3 className="font-bold text-slate-900 text-lg leading-tight mb-1">{product.name}</h3>
-                                     <p className="text-xs text-slate-500 bg-slate-100 inline-block px-2 py-1 rounded">{product.category}</p>
+                                     <div className="flex flex-wrap gap-1">
+                                         <p className="text-xs text-slate-500 bg-slate-100 inline-block px-2 py-1 rounded">{product.category}</p>
+                                         {product.subcategory && (
+                                             <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 inline-block px-2 py-1 rounded flex items-center gap-0.5">
+                                                 <ChevronRight className="w-3 h-3 text-slate-300" />
+                                                 {product.subcategory}
+                                             </p>
+                                         )}
+                                     </div>
                                  </div>
                              </div>
                              
