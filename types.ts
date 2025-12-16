@@ -121,9 +121,10 @@ export interface ProductPrintStatus {
 
 export interface ProductConfig {
   id: string; // Temporary ID for list management in form
-  part1Color: string; // Base
-  part2Color: string; // Bola
-  part3Color: string; // Detalhe/Topo
+  productType?: 'default' | 'vaso'; // NEW: Identifies the type of product
+  part1Color: string; // Base (or Main Color for Vase)
+  part2Color: string; // Bola (Unused for Vase)
+  part3Color: string; // Detalhe/Topo (Unused for Vase)
   textureType: 'cadastrada' | 'personalizada';
   textureValue: string;
   dogName: string;

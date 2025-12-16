@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Save, User, Box, Layers, Palette, DollarSign, ShoppingCart, Trash2, Users, Truck, Loader2, Search, ImageOff } from 'lucide-react';
 import { 
@@ -19,6 +19,7 @@ interface OrderFormProps {
   onCancel: () => void;
   initialOrder?: Order | null;
   isPublic?: boolean; // New prop to control visibility
+  initialProductType?: 'default' | 'vaso';
 }
 
 export const OrderForm: React.FC<OrderFormProps> = ({ 
@@ -27,7 +28,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   onSave, 
   onCancel,
   initialOrder,
-  isPublic = false
+  isPublic = false,
+  initialProductType = 'default'
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
   
@@ -37,6 +39,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   // Current product being configured
   const [currentProduct, setCurrentProduct] = useState<ProductConfig>({
     id: uuidv4(),
+    productType: initialProductType,
     part1Color: partsColors.base[0]?.hex || '#000000',
     part2Color: partsColors.ball[0]?.hex || '#000000',
     part3Color: partsColors.top[0]?.hex || '#000000',
@@ -122,6 +125,16 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     }
   }, [initialOrder]);
 
+  // Combine Vase Colors (Base + Top)
+  const vaseColors = useMemo(() => {
+    const combined = [...partsColors.base, ...partsColors.top];
+    // Dedup by hex
+    const unique = new Map();
+    combined.forEach(c => unique.set(c.hex, c));
+    return Array.from(unique.values());
+  }, [partsColors]);
+
+
   // --- Handlers ---
 
   const handleProductChange = (key: keyof ProductConfig, value: string) => {
@@ -134,6 +147,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     // Reset form for next item
     setCurrentProduct({
         id: uuidv4(),
+        productType: initialProductType, // Keep same type for simplicity in session
         part1Color: partsColors.base[0]?.hex || '#000000',
         part2Color: partsColors.ball[0]?.hex || '#000000',
         part3Color: partsColors.top[0]?.hex || '#000000',
@@ -443,6 +457,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     );
   };
 
+  const isVaseMode = currentProduct.productType === 'vaso';
+
   return (
     <form onSubmit={handleSubmit} className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="border-b border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
@@ -483,12 +499,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                             <div key={item.id} className="bg-white p-3 rounded-lg border border-indigo-100 flex items-center justify-between shadow-sm">
                                 <div className="flex items-center gap-3">
                                     <div className="flex gap-1">
-                                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{backgroundColor: item.part1Color}} title="Base"></div>
-                                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{backgroundColor: item.part2Color}} title="Bola"></div>
-                                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{backgroundColor: item.part3Color}} title="Topo"></div>
+                                        <div className="w-4 h-4 rounded-full border border-slate-200" style={{backgroundColor: item.part1Color}} title="Principal"></div>
+                                        {item.productType !== 'vaso' && (
+                                          <>
+                                            <div className="w-4 h-4 rounded-full border border-slate-200" style={{backgroundColor: item.part2Color}} title="Bola"></div>
+                                            <div className="w-4 h-4 rounded-full border border-slate-200" style={{backgroundColor: item.part3Color}} title="Topo"></div>
+                                          </>
+                                        )}
                                     </div>
                                     <div className="text-sm">
-                                        <span className="font-medium text-slate-900 block">Item #{index + 1} {item.dogName ? `- ${item.dogName}` : ''}</span>
+                                        <span className="font-medium text-slate-900 block">
+                                          Item #{index + 1} 
+                                          {item.productType === 'vaso' ? ' (Vaso)' : (item.dogName ? ` - ${item.dogName}` : '')}
+                                        </span>
                                         <span className="text-xs text-slate-500">{item.textureValue}</span>
                                     </div>
                                 </div>
@@ -515,118 +538,134 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Cores das Partes</h4>
-                  <ColorPicker 
-                    label="Parte 3 (Detalhes/Topo)" 
-                    options={partsColors.top}
-                    selected={currentProduct.part3Color} 
-                    onChange={(c) => handleProductChange('part3Color', c)} 
-                  />
-                  <ColorPicker 
-                    label="Parte 2 (Bola)" 
-                    options={partsColors.ball}
-                    selected={currentProduct.part2Color} 
-                    onChange={(c) => handleProductChange('part2Color', c)} 
-                  />
-                  <ColorPicker 
-                    label="Parte 1 (Base)" 
-                    options={partsColors.base}
-                    selected={currentProduct.part1Color} 
-                    onChange={(c) => handleProductChange('part1Color', c)} 
-                  />
+                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Cores</h4>
+                  
+                  {isVaseMode ? (
+                      <ColorPicker 
+                        label="Cor do Vaso" 
+                        options={vaseColors}
+                        selected={currentProduct.part1Color} 
+                        onChange={(c) => handleProductChange('part1Color', c)} 
+                      />
+                  ) : (
+                    <>
+                      <ColorPicker 
+                        label="Parte 3 (Detalhes/Topo)" 
+                        options={partsColors.top}
+                        selected={currentProduct.part3Color} 
+                        onChange={(c) => handleProductChange('part3Color', c)} 
+                      />
+                      <ColorPicker 
+                        label="Parte 2 (Bola)" 
+                        options={partsColors.ball}
+                        selected={currentProduct.part2Color} 
+                        onChange={(c) => handleProductChange('part2Color', c)} 
+                      />
+                      <ColorPicker 
+                        label="Parte 1 (Base)" 
+                        options={partsColors.base}
+                        selected={currentProduct.part1Color} 
+                        onChange={(c) => handleProductChange('part1Color', c)} 
+                      />
+                    </>
+                  )}
                 </div>
 
                 <div className="pt-4 border-t border-slate-100">
                   <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Detalhes</h4>
                   
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Textura (Parte 3)</label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="radio" 
-                          name="textureType"
-                          checked={currentProduct.textureType === 'cadastrada'}
-                          onChange={() => handleProductChange('textureType', 'cadastrada')}
-                          className="text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <span>Padrão</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="radio" 
-                          name="textureType"
-                          checked={currentProduct.textureType === 'personalizada'}
-                          onChange={() => {
-                            handleProductChange('textureType', 'personalizada');
-                            handleProductChange('textureValue', '');
-                          }}
-                          className="text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <span>Personalizada</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    {currentProduct.textureType === 'cadastrada' ? (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Selecione a Textura</label>
-                        <select 
-                          className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                          value={currentProduct.textureValue}
-                          onChange={(e) => handleProductChange('textureValue', e.target.value)}
-                        >
-                          {availableTextures.length === 0 && <option value="">Nenhuma textura cadastrada</option>}
-                          {availableTextures.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
+                  {!isVaseMode && (
+                    <>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Textura (Parte 3)</label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="textureType"
+                            checked={currentProduct.textureType === 'cadastrada'}
+                            onChange={() => handleProductChange('textureType', 'cadastrada')}
+                            className="text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span>Padrão</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="textureType"
+                            checked={currentProduct.textureType === 'personalizada'}
+                            onChange={() => {
+                              handleProductChange('textureType', 'personalizada');
+                              handleProductChange('textureValue', '');
+                            }}
+                            className="text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span>Personalizada</span>
+                        </label>
                       </div>
-                    ) : (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Descreva a Textura</label>
+                    </div>
+
+                    <div className="mb-4">
+                      {currentProduct.textureType === 'cadastrada' ? (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Selecione a Textura</label>
+                          <select 
+                            className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                            value={currentProduct.textureValue}
+                            onChange={(e) => handleProductChange('textureValue', e.target.value)}
+                          >
+                            {availableTextures.length === 0 && <option value="">Nenhuma textura cadastrada</option>}
+                            {availableTextures.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Descreva a Textura</label>
+                          <input 
+                            type="text"
+                            className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                            placeholder="Ex: Escamas de dragão, Floral..."
+                            value={currentProduct.textureValue}
+                            onChange={(e) => handleProductChange('textureValue', e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mb-4">
+                      <div className="flex items-center gap-4 mb-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-0">Gravar nome do cachorrinho?</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newState = !showDogNameInput;
+                            setShowDogNameInput(newState);
+                            if (!newState) {
+                              handleProductChange('dogName', '');
+                            }
+                          }}
+                          className={`px-4 py-1 rounded-full text-xs font-bold transition-all border ${
+                            showDogNameInput 
+                              ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-200' 
+                              : 'bg-white text-slate-400 border-slate-300 hover:border-indigo-300'
+                          }`}
+                        >
+                          SIM
+                        </button>
+                      </div>
+                      
+                      {showDogNameInput && (
                         <input 
                           type="text"
-                          className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                          placeholder="Ex: Escamas de dragão, Floral..."
-                          value={currentProduct.textureValue}
-                          onChange={(e) => handleProductChange('textureValue', e.target.value)}
+                          className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white animate-fade-in"
+                          placeholder="Nome para gravar na peça"
+                          value={currentProduct.dogName}
+                          onChange={(e) => handleProductChange('dogName', e.target.value)}
                         />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mb-4">
-                    <div className="flex items-center gap-4 mb-2">
-                      <label className="block text-sm font-medium text-slate-700 mb-0">Gravar nome do cachorrinho?</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newState = !showDogNameInput;
-                          setShowDogNameInput(newState);
-                          if (!newState) {
-                            handleProductChange('dogName', '');
-                          }
-                        }}
-                        className={`px-4 py-1 rounded-full text-xs font-bold transition-all border ${
-                          showDogNameInput 
-                            ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-200' 
-                            : 'bg-white text-slate-400 border-slate-300 hover:border-indigo-300'
-                        }`}
-                      >
-                        SIM
-                      </button>
+                      )}
                     </div>
-                    
-                    {showDogNameInput && (
-                      <input 
-                        type="text"
-                        className="w-full rounded-lg border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white animate-fade-in"
-                        placeholder="Nome para gravar na peça"
-                        value={currentProduct.dogName}
-                        onChange={(e) => handleProductChange('dogName', e.target.value)}
-                      />
-                    )}
-                  </div>
+                    </>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Observações do Item</label>
@@ -657,33 +696,45 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <h4 className="text-slate-500 font-medium mb-12 uppercase tracking-wider text-sm">Visualização do Item Atual</h4>
                 <div className="relative flex flex-col items-center">
                   
-                  {/* Part 3 (Top) - Image Based */}
-                  <PartRenderer 
-                    imageSrc="top.png"
-                    color={currentProduct.part3Color}
-                    zIndex={30}
-                    className="w-40 h-24 mb-[-12px]"
-                    texturePattern={currentProduct.textureValue}
-                    label="TAMPA"
-                  />
-                  
-                  {/* Part 2 (Ball) - Image Based */}
-                  <PartRenderer 
-                    imageSrc="ball.png"
-                    color={currentProduct.part2Color}
-                    zIndex={20}
-                    className="w-20 h-20 mb-[-15px]" 
-                    label="BOLA"
-                  />
+                  {isVaseMode ? (
+                      <PartRenderer 
+                        imageSrc="vaso.png"
+                        color={currentProduct.part1Color}
+                        zIndex={10}
+                        className="w-64 h-64" 
+                        label="VASO"
+                      />
+                  ) : (
+                    <>
+                      {/* Part 3 (Top) - Image Based */}
+                      <PartRenderer 
+                        imageSrc="top.png"
+                        color={currentProduct.part3Color}
+                        zIndex={30}
+                        className="w-40 h-24 mb-[-12px]"
+                        texturePattern={currentProduct.textureValue}
+                        label="TAMPA"
+                      />
+                      
+                      {/* Part 2 (Ball) - Image Based */}
+                      <PartRenderer 
+                        imageSrc="ball.png"
+                        color={currentProduct.part2Color}
+                        zIndex={20}
+                        className="w-20 h-20 mb-[-15px]" 
+                        label="BOLA"
+                      />
 
-                  {/* Part 1 (Base) - Image Based - Updated Size */}
-                  <PartRenderer 
-                    imageSrc="base.png"
-                    color={currentProduct.part1Color}
-                    zIndex={10}
-                    className="w-[19rem] h-24" 
-                    label="BASE"
-                  />
+                      {/* Part 1 (Base) - Image Based - Updated Size */}
+                      <PartRenderer 
+                        imageSrc="base.png"
+                        color={currentProduct.part1Color}
+                        zIndex={10}
+                        className="w-[19rem] h-24" 
+                        label="BASE"
+                      />
+                    </>
+                  )}
                 </div>
                 
                 <div className="mt-12 flex flex-col gap-1 items-center">

@@ -29,6 +29,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   
   const [showOrderModal, setShowOrderModal] = useState(false);
+  // Controls the mode of the order form (Standard vs Vase)
+  const [orderMode, setOrderMode] = useState<'default' | 'vaso'>('default');
   const [orderSubmitted, setOrderSubmitted] = useState(false);
   
   useEffect(() => {
@@ -96,9 +98,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
+  const handleOpenOrderModal = (product?: CatalogProduct) => {
+    // Check if the product belongs to "Vasos" subcategory
+    if (product && product.subcategory && product.subcategory.toLowerCase().includes('vaso')) {
+        setOrderMode('vaso');
+    } else {
+        setOrderMode('default');
+    }
+    setShowOrderModal(true);
+  };
+
   const closeOrderModal = () => {
     setShowOrderModal(false);
     setOrderSubmitted(false);
+    setOrderMode('default');
   };
 
   const filteredProducts = products.filter(p => {
@@ -266,7 +279,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                          Qualidade em cada camada
                      </h2>
                      <button 
-                        onClick={() => setShowOrderModal(true)}
+                        onClick={() => handleOpenOrderModal()}
                         className="pointer-events-auto bg-indigo-600 text-white px-6 py-2 md:px-8 md:py-3 rounded-full font-bold text-sm md:text-lg hover:bg-indigo-500 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 opacity-0 animate-fade-in-up" 
                         style={{animationDelay: '0.4s'}}
                      >
@@ -375,7 +388,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                                      R$ {product.price.toFixed(2)}
                                  </span>
                                  <button 
-                                    onClick={() => setShowOrderModal(true)}
+                                    onClick={() => handleOpenOrderModal(product)}
                                     className="bg-indigo-600 text-white p-2.5 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
                                     title="Eu quero este!"
                                  >
@@ -431,7 +444,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <h4 className="text-white font-bold mb-4">Links Rápidos</h4>
                   <ul className="space-y-2 text-sm">
                       <li><button onClick={() => window.scrollTo(0,0)} className="hover:text-indigo-400 transition-colors">Início</button></li>
-                      <li><button onClick={() => setShowOrderModal(true)} className="hover:text-indigo-400 transition-colors">Fazer Pedido</button></li>
+                      <li><button onClick={() => handleOpenOrderModal()} className="hover:text-indigo-400 transition-colors">Fazer Pedido</button></li>
                       <li><button onClick={onEnterProduction} className="hover:text-indigo-400 transition-colors">Área do Cliente</button></li>
                   </ul>
               </div>
@@ -473,6 +486,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                               partsColors={partsColors}
                               availableTextures={availableTextures}
                               isPublic={true}
+                              initialProductType={orderMode}
                           />
                       </div>
                   )}
